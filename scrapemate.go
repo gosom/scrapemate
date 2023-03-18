@@ -1,14 +1,9 @@
 package scrapemate
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -26,34 +21,38 @@ func New(options ...func(*scrapeMate) error) (*scrapeMate, error) {
 			return nil, err
 		}
 	}
+
+	if s.jobProvider == nil {
+		return nil, ErrorNoJobProvider
+	}
+	if s.httpFetcher == nil {
+		return nil, ErrorNoHttpFetcher
+	}
+	// here we can set default options
+	s.results = make(chan Result)
+
 	if s.ctx == nil {
 		s.ctx, s.cancelFn = context.WithCancelCause(context.Background())
 	}
 	if s.cancelFn == nil {
 		s.ctx, s.cancelFn = context.WithCancelCause(s.ctx)
 	}
-	// here we can set default options
 	if s.log == nil {
 		s.log = logging.Get().With("component", "scrapemate")
 		s.log.Debug("using default logger")
 	}
-	if s.jobProvider == nil {
-		return nil, ErrorNoJobProvider
-	}
 	if s.concurrency == 0 {
 		s.concurrency = 1
 	}
-	if s.netClient == nil {
-		s.netClient = &http.Client{
-			Timeout: 30 * time.Second,
-		}
-	}
-	s.buffers = sync.Pool{
-		New: func() interface{} {
-			return new(bytes.Buffer)
-		},
-	}
 	return s, nil
+}
+
+// WithFailed sets the failed jobs channel for the scrapemate
+func WithFailed() func(*scrapeMate) error {
+	return func(s *scrapeMate) error {
+		s.failedJobs = make(chan IJob)
+		return nil
+	}
 }
 
 // WithContext sets the context for the scrapemate
@@ -101,29 +100,57 @@ func WithConcurrency(concurrency int) func(*scrapeMate) error {
 	}
 }
 
-// WithHttpClient sets the http client for the scrapemate
-func WithHttpClient(client HttpClient) func(*scrapeMate) error {
+// WithHttpFetcher sets the http fetcher for the scrapemate
+func WithHttpFetcher(client HttpFetcher) func(*scrapeMate) error {
 	return func(s *scrapeMate) error {
 		if client == nil {
-			return ErrorNoHttpClient
+			return ErrorNoHttpFetcher
 		}
-		s.netClient = client
+		s.httpFetcher = client
 		return nil
 	}
 }
 
+// WithHtmlParser sets the html parser for the scrapemate
+func WithHtmlParser(parser HtmlParser) func(*scrapeMate) error {
+	return func(s *scrapeMate) error {
+		if parser == nil {
+			return ErrorNoHtmlParser
+		}
+		s.htmlParser = parser
+		return nil
+	}
+}
+
+// Result is the struct items of which the Results channel has
+type Result struct {
+	Job  IJob
+	Data any
+}
+
+// scrapemate contains unexporter fields
 type scrapeMate struct {
 	log         logging.Logger
 	ctx         context.Context
 	cancelFn    context.CancelCauseFunc
 	jobProvider JobProvider
 	concurrency int
-	netClient   HttpClient
-	buffers     sync.Pool
+	httpFetcher HttpFetcher
+	htmlParser  HtmlParser
+	results     chan Result
+	failedJobs  chan IJob
 }
 
+// Start starts the scraper
 func (s *scrapeMate) Start() error {
 	s.log.Info("starting scrapemate")
+	defer func() {
+		close(s.results)
+		if s.failedJobs != nil {
+			close(s.failedJobs)
+		}
+		s.log.Info("scrapemate exited")
+	}()
 	exitChan := make(chan os.Signal, 1)
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)
 	s.waitForSignal(exitChan)
@@ -138,6 +165,137 @@ func (s *scrapeMate) Start() error {
 	wg.Wait()
 	<-s.Done()
 	return s.Err()
+}
+
+// Concurrency returns how many workers are running in parallel
+func (s *scrapeMate) Concurrency() int {
+	return s.concurrency
+}
+
+// Results returns a channel containing the results
+func (s *scrapeMate) Results() <-chan Result {
+	return s.results
+}
+
+// Failed returns the chanell that contains the jobs that failed. It's nil if
+// you don't use the WithFailed option
+func (s *scrapeMate) Failed() <-chan IJob {
+	return s.failedJobs
+}
+
+// DoJob scrapes a job and returns it's result
+func (s *scrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJob, err error) {
+	startTime := time.Now().UTC()
+	s.log.Debug("starting job", "job", job)
+	var resp Response
+	defer func() {
+		args := []any{
+			"job", job,
+		}
+		if r := recover(); r != nil {
+			args = append(args, "error", r)
+			args = append(args, "status", "failed")
+			err = fmt.Errorf("panic while executing job: %v", r)
+			return
+		}
+		if resp.Error != nil {
+			args = append(args, "error", resp.Error)
+			args = append(args, "status", "failed")
+		} else {
+			args = append(args, "status", "success")
+		}
+		args = append(args, "duration", time.Now().UTC().Sub(startTime))
+		s.log.Info("job finished", args...)
+	}()
+
+	resp = s.doFetch(ctx, job)
+	if resp.Error != nil {
+		err = resp.Error
+		return
+	}
+
+	// cache the response if needed
+	// process the response
+	if s.htmlParser != nil {
+		resp.Document, err = s.htmlParser.Parse(ctx, resp.Body)
+		if err != nil {
+			s.log.Error("error while setting document", "error", err)
+			return
+		}
+	}
+	ctx = context.WithValue(ctx, "log", s.log.With("jobid", job.GetID()))
+	result, next, err = job.Process(ctx)
+	if err != nil {
+		// TODO shall I retry?
+		s.log.Error("error while processing job", "error", err)
+		return
+	}
+	return
+}
+
+func (s *scrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
+	var ok bool
+	defer func() {
+		if !ok && ans.Error == nil {
+			ans.Error = fmt.Errorf("status code %d", ans.StatusCode)
+		}
+	}()
+	maxRetries := s.getMaxRetries(job)
+	delay := time.Millisecond * 100
+	retryPolicy := job.GetRetryPolicy()
+	retry := 0
+	for {
+		ans = s.httpFetcher.Fetch(ctx, job)
+		ok = job.DoCheckResponse(ans)
+		if ok {
+			return
+		}
+
+		if retryPolicy == DiscardJob {
+			s.log.Warn("discarding job because of policy")
+			return
+		}
+
+		if retryPolicy == StopScraping {
+			s.log.Warn("stopping scraping because of policy")
+			s.cancelFn(errors.New("stopping scraping because of policy"))
+			return
+		}
+
+		if retry >= maxRetries {
+			return
+		}
+		retry++
+		switch retryPolicy {
+		case RetryJob:
+			time.Sleep(delay)
+			if delay > job.GetMaxRetryDelay() {
+				delay = job.GetMaxRetryDelay()
+			} else {
+				delay = delay * 2
+			}
+		case RefreshIP:
+			// TODO
+		}
+	}
+}
+
+func (s *scrapeMate) getMaxRetries(job IJob) int {
+	maxRetries := job.GetMaxRetries()
+	if maxRetries > 5 {
+		maxRetries = 5
+	}
+	return maxRetries
+}
+
+// Done returns a channel  that's closed when the work is done
+func (s *scrapeMate) Done() <-chan struct{} {
+	return s.ctx.Done()
+}
+
+// Err returns the error that caused scrapemate's context cancellation
+func (s *scrapeMate) Err() error {
+	return context.Cause(s.ctx)
 }
 
 func (s *scrapeMate) waitForSignal(sigChan <-chan os.Signal) {
@@ -159,152 +317,46 @@ func (s *scrapeMate) startWorker(ctx context.Context) {
 		case err := <-errc:
 			s.log.Error("error while getting jobs...going to wait a bit", "error", err)
 			time.Sleep(1 * time.Second)
+			jobc, errc = s.jobProvider.Jobs(ctx)
+			s.log.Info("restarted job provider")
 		case job := <-jobc:
-			s.doJob(ctx, job)
+			ans, next, err := s.DoJob(ctx, job)
+			if err != nil {
+				s.log.Error("error while processing job", "error", err)
+				s.pushToFailedJobs(job)
+				continue
+			}
+			if err := s.finishJob(ctx, job, ans, next); err != nil {
+				s.log.Error("error while finishing job", "error", err)
+				s.pushToFailedJobs(job)
+			}
 		}
 	}
 }
 
-func (s *scrapeMate) doJob(ctx context.Context, job IJob) {
-	startTime := time.Now().UTC()
-	s.log.Debug("starting job", "job", job)
-	var (
-		resp Response
-		ok   bool
-	)
-	defer func() {
-		if r := recover(); r != nil {
-			s.log.Error("panic while executing job", "job", job, "error", r)
-			panic(r)
-			return
-		}
-		if !ok {
-			s.log.Warn("job failed", "job", job, "error", resp.Error, "status", resp.StatusCode)
-			return
-		}
-		s.log.Info("job finished", "job", job, "duration", time.Now().UTC().Sub(startTime))
-	}()
-	retryPolicy := job.GetRetryPolicy()
-	delay := time.Millisecond * 100
-	retry := 0
-	for {
-		resp = s.crawl(ctx, job)
-		switch job.DoCheckResponse {
-		case nil:
-			ok = resp.StatusCode >= 200 && resp.StatusCode < 300
-		default:
-			ok = job.DoCheckResponse(resp)
-		}
-		if ok {
-			break
-		}
-		if retry >= job.GetMaxRetries() {
-			break
-		}
-		retry++
-		switch retryPolicy {
-		case StopScraping:
-			s.log.Warn("stopping scraping because of policy")
-			s.cancelFn(errors.New("stopping scraping because of policy"))
-			return
-		case DiscardJob:
-			return
-		case RetryJob:
-			time.Sleep(delay)
-			delay = delay * 2
-		case RefreshIP:
-			// TODO
-		}
-	}
-	if !ok {
-		return
-	}
-	// cache the response if needed
-	// process the response
-	if err := resp.SetDocument(); err != nil {
-		s.log.Error("error while setting document", "error", err)
-		return
-	}
-	job.SetResponse(resp)
-	ctx = context.WithValue(ctx, "log", s.log.With("jobid", job.GetID()))
-	next, err := job.Process(ctx, nil)
-	if err != nil {
-		// TODO shall I retry?
-		s.log.Error("error while processing job", "error", err)
-		return
-	}
-	for i := range next {
-		s.jobProvider.Push(ctx, next[i])
+func (s *scrapeMate) pushToFailedJobs(job IJob) {
+	if s.failedJobs != nil {
+		s.failedJobs <- job
 	}
 }
 
-func (s *scrapeMate) crawl(ctx context.Context, job IJob) Response {
-	jobParams := job.GetUrlParams()
-	params := url.Values{}
-	for k, v := range jobParams {
-		params.Add(k, v)
+func (s *scrapeMate) finishJob(ctx context.Context, job IJob, ans any, next []IJob) error {
+	if err := s.pushJobs(ctx, next); err != nil {
+		return fmt.Errorf("%w: while pushing jobs", err)
 	}
-	u := job.GetURL() + "?" + params.Encode()
+	s.results <- Result{
+		Job:  job,
+		Data: ans,
+	}
+	return nil
+}
 
-	var reqBody *bytes.Buffer
-	reqBody = s.getBuffer()
-	defer s.putBuffer(reqBody)
-	if len(job.GetBody()) > 0 {
-		reqBody.Write(job.GetBody())
-	}
-	var ans Response
-	req, err := http.NewRequestWithContext(ctx, job.GetMethod(), u, reqBody)
-	if err != nil {
-		ans.Error = err
-		return ans
-	}
-	for k, v := range job.GetHeaders() {
-		req.Header.Add(k, v)
-	}
-	resp, err := s.netClient.Do(req)
-	if err != nil {
-		ans.Error = err
-		return ans
-	}
-	defer func() {
-		io.Copy(ioutil.Discard, resp.Body)
-		resp.Body.Close()
-	}()
-	ans.StatusCode = resp.StatusCode
-	ans.Headers = http.Header{}
-	for k, v := range resp.Header {
-		ans.Headers[k] = v
-	}
-	var reader io.ReadCloser
-	switch resp.Header.Get("Content-Encoding") {
-	case "gzip":
-		reader, err = gzip.NewReader(resp.Body)
-		if err != nil {
-			ans.Error = err
-			return ans
+func (s *scrapeMate) pushJobs(ctx context.Context, jobs []IJob) error {
+	for i := range jobs {
+		fmt.Println("pushing job", jobs[i])
+		if err := s.jobProvider.Push(ctx, jobs[i]); err != nil {
+			return err
 		}
-		defer reader.Close()
-	default:
-		reader = resp.Body
 	}
-	ans.Data, ans.Error = ioutil.ReadAll(reader)
-	return ans
-}
-
-func (s *scrapeMate) getBuffer() *bytes.Buffer {
-	b := s.buffers.Get().(*bytes.Buffer)
-	b.Reset()
-	return b
-}
-
-func (s *scrapeMate) putBuffer(buf *bytes.Buffer) {
-	s.buffers.Put(buf)
-}
-
-func (s *scrapeMate) Done() <-chan struct{} {
-	return s.ctx.Done()
-}
-
-func (s *scrapeMate) Err() error {
-	return context.Cause(s.ctx)
+	return nil
 }

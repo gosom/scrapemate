@@ -10,9 +10,14 @@ vet: ## runs go vet
 test: ## runs the unit tests
 	go test -v -race -timeout 5m ./...
 
-test-cover-view: ## outputs the coverage statistics
+test-cover: ## outputs the coverage statistics
 	go test -v -race -timeout 5m ./... -coverprofile coverage.out
 	go tool cover -func coverage.out
 	rm coverage.out
+
+test-cover-report: ## an html report of the coverage statistics
+	go test -v ./... -covermode=count -coverpkg=./... -coverprofile coverage.out
+	go tool cover -html coverage.out -o coverage.html
+	open coverage.html
 
 

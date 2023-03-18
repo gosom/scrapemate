@@ -1,34 +1,25 @@
 package scrapemate
 
 import (
-	"bytes"
 	"net/http"
 	"time"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
-type Document struct {
-	*goquery.Document
-}
-
+// Response is the struct that it is returned when crawling finishes
 type Response struct {
 	StatusCode int
 	Headers    http.Header
 	Duration   time.Duration
-	Data       []byte
+	Body       []byte
 	Error      error
 	Meta       map[string]any
 
-	Document *Document
-}
-
-func (o *Response) SetDocument() error {
-	o.Document = &Document{}
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(o.Data))
-	if err != nil {
-		return err
-	}
-	o.Document.Document = doc
-	return nil
+	// Document is the parsed document
+	// if you don't set an html parser the document will be nil
+	// Since each html parser has it's own document type
+	// the document is an interface
+	// You need to cast it to the type of the parser you are using
+	// For example if you are using goquery you need to cast it to *goquery.Document
+	// If you are using the stdib parser net/html the it will be *html.Node
+	Document any
 }

@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
-	github.com/google/uuid v1.3.0
+	github.com/golang/mock v1.6.0
 	github.com/gosom/kit v0.0.0-20230309082109-543b32ac686a
 	github.com/stretchr/testify v1.8.1
 )
