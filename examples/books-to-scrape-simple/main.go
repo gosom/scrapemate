@@ -107,6 +107,7 @@ func writeCsv(results <-chan scrapemate.Result) error {
 		if err := w.Write(product.CsvRow()); err != nil {
 			return err
 		}
+		w.Flush()
 	}
 	return w.Error()
 }

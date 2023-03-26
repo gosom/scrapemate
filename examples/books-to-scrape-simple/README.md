@@ -1,7 +1,6 @@
-## Extract product information to csv from books.toscrape.com
+# Extract product information to csv from books.toscrape.com
 
-
-### Introduction
+This is an example use case of scrapemate. 
 
 Here we are going to scrape all the books from [books.toscrape.com](https://books.toscrape.com/).
 
@@ -22,4 +21,17 @@ number_of_reviews: the number of reviews the product has
 ```
 
 We want to save them in a csv file with headers the column names.
+
+
+###  How to run it
+
+```
+go run main.go 1>bookstoscrape.csv
+```
+
+The crawler does not have a mechanism to exit when crawling finishes, it justs sits there
+and waits for new jobs.
+
+You can exit the crawler via CTRL-C when there are no logs or when you have 1001 rows in the 
+`bookstoscrape.csv` file.
 
