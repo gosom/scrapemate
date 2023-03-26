@@ -18,6 +18,8 @@ type Product struct {
 	Availability     int
 	NumbersOfReviews int
 	URL              string
+
+	Screenshot []byte
 }
 
 func (o Product) CsvHeaders() []string {

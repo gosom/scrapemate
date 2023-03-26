@@ -35,3 +35,13 @@ and waits for new jobs.
 You can exit the crawler via CTRL-C when there are no logs or when you have 1001 rows in the 
 `bookstoscrape.csv` file.
 
+## Fetch using Javascript Rendering and store screenshots
+
+if you want to try javascript rendering use the flag `-js`
+
+In that case we also need to generate screenshots for each product and save them to
+a folder name `screenshots`. Each screenshot will have the name `{UPC}.png`, where UPC is the product
+identifier as parsed
+
+
+

@@ -14,6 +14,7 @@ type Response struct {
 	Body       []byte
 	Error      error
 	Meta       map[string]any
+	Screenshot []byte
 
 	// Document is the parsed document
 	// if you don't set an html parser the document will be nil

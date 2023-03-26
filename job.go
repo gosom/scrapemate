@@ -3,7 +3,10 @@ package scrapemate
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
+
+	"github.com/playwright-community/playwright-go"
 )
 
 var _ IJob = (*Job)(nil)
@@ -37,6 +40,10 @@ type IJob interface {
 	Process(ctx context.Context, resp Response) (any, []IJob, error)
 	// GetMaxRetryDelay returns the delay to wait before retrying
 	GetMaxRetryDelay() time.Duration
+	BrowserActions(browser playwright.Browser) Response
+	// DoScreenshot takes a screenshot of the page
+	// Only works if the scraper uses jsfetcher
+	DoScreenshot() bool
 }
 
 // Job is the base job that we may use
@@ -76,6 +83,69 @@ type Job struct {
 	// for a MaxRetries numbers of time. If the sleep time between the retries is more than
 	// MaxRetryDelay then it's capped to that. (Default is 2 seconds)
 	MaxRetryDelay time.Duration
+	//TakeScreenshot if true takes a screenshot of the page
+	TakeScreenshot bool
+	Response       Response
+}
+
+// DoScreenshot used to check if we need a screenshot
+// It's here since it's a common use case
+func (j *Job) DoScreenshot() bool {
+	return j.TakeScreenshot
+}
+
+// BrowserActions is the function that will be executed in the browser
+// This is the function that will be executed in the browser
+// this is a default implementation that will just return the response
+// override this function to perform actions in the browser
+func (j *Job) BrowserActions(browser playwright.Browser) Response {
+	var resp Response
+	bctx, err := browser.NewContext(playwright.BrowserNewContextOptions{})
+	if err != nil {
+		resp.Error = err
+		return resp
+	}
+	defer bctx.Close()
+	page, err := bctx.NewPage()
+	if err != nil {
+		resp.Error = err
+		return resp
+	}
+	defer page.Close()
+	if err := page.SetViewportSize(1920, 1057); err != nil {
+		resp.Error = err
+		return resp
+	}
+	pageResponse, err := page.Goto(j.GetURL(), playwright.PageGotoOptions{
+		WaitUntil: playwright.WaitUntilStateNetworkidle,
+	})
+	if err != nil {
+		resp.Error = err
+		return resp
+	}
+	resp.URL = pageResponse.URL()
+	resp.StatusCode = pageResponse.Status()
+	resp.Headers = make(http.Header, len(pageResponse.Headers()))
+	for k, v := range pageResponse.Headers() {
+		resp.Headers.Add(k, v)
+	}
+	body, err := pageResponse.Body()
+	if err != nil {
+		resp.Error = err
+		return resp
+	}
+	resp.Body = []byte(body)
+	if j.DoScreenshot() {
+		screenshot, err := page.Screenshot(playwright.PageScreenshotOptions{
+			FullPage: playwright.Bool(true),
+		})
+		if err != nil {
+			resp.Error = err
+			return resp
+		}
+		resp.Screenshot = screenshot
+	}
+	return resp
 }
 
 // String returns the string representation of the job

@@ -26,5 +26,6 @@ func (o *BookDetailJob) Process(ctx context.Context, resp scrapemate.Response) (
 		return nil, nil, err
 	}
 	product.URL = resp.URL
+	product.Screenshot = resp.Screenshot
 	return product, nil, nil
 }

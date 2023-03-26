@@ -42,9 +42,10 @@ func (o *BookCollectJob) Process(ctx context.Context, resp scrapemate.Response) 
 				Headers: map[string]string{
 					"User-Agent": scrapemate.DefaultUserAgent,
 				},
-				Timeout:    10 * time.Second,
-				MaxRetries: 3,
-				Priority:   1,
+				Timeout:        10 * time.Second,
+				MaxRetries:     3,
+				Priority:       1,
+				TakeScreenshot: true,
 			},
 		})
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"errors"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/gosom/scrapemate"
+	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
 	provider "github.com/gosom/scrapemate/adapters/providers/memory"
@@ -33,6 +35,10 @@ func main() {
 func run() error {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(errors.New("deferred cancel"))
+
+	var useJS bool
+	flag.BoolVar(&useJS, "js", false, "use javascript")
+	flag.Parse()
 	// create a new memory provider
 	provider := provider.New()
 	// we will start  a go routine that will push jobs to the provider
@@ -55,9 +61,19 @@ func run() error {
 		provider.Push(ctx, job)
 	}()
 
-	httpFetcher := fetcher.New(&http.Client{
-		Timeout: 10 * time.Second,
-	})
+	var httpFetcher scrapemate.HttpFetcher
+	var err error
+	switch useJS {
+	case true:
+		httpFetcher, err = jsfetcher.New(true)
+		if err != nil {
+			return err
+		}
+	default:
+		httpFetcher = fetcher.New(&http.Client{
+			Timeout: 10 * time.Second,
+		})
+	}
 
 	mate, err := scrapemate.New(
 		scrapemate.WithContext(ctx, cancel),
@@ -90,6 +106,10 @@ func writeCsv(results <-chan scrapemate.Result) error {
 	w := csv.NewWriter(os.Stdout)
 	defer w.Flush()
 	headersWritten := false
+	screenshotFolder := "screenshots"
+	if err := os.MkdirAll(screenshotFolder, 0755); err != nil {
+		return err
+	}
 	for result := range results {
 		if result.Data == nil {
 			continue
@@ -97,6 +117,12 @@ func writeCsv(results <-chan scrapemate.Result) error {
 		product, ok := result.Data.(bookstoscrape.Product)
 		if !ok {
 			return fmt.Errorf("unexpected data type: %T", result.Data)
+		}
+		if result.Job.DoScreenshot() && len(product.Screenshot) > 0 {
+			path := fmt.Sprintf("%s/%s.png", screenshotFolder, product.UPC)
+			if err := os.WriteFile(path, product.Screenshot, 0644); err != nil {
+				return err
+			}
 		}
 		if !headersWritten {
 			if err := w.Write(product.CsvHeaders()); err != nil {
