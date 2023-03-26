@@ -407,7 +407,6 @@ func Test_Start(t *testing.T) {
 					return
 				}
 			}
-			return
 		}()
 		require.NoError(t, doneErr)
 		require.Len(t, doneList, 2)

@@ -7,6 +7,7 @@ import (
 // JobProvider is an interface for job providers
 // a job provider is a service that provides jobs to scrapemate
 // scrapemate will call the job provider to get jobs
+//
 //go:generate mockgen -destination=mock/mock_provider.go -package=mock . JobProvider
 type JobProvider interface {
 	Jobs(ctx context.Context) (<-chan IJob, <-chan error)
@@ -15,12 +16,14 @@ type JobProvider interface {
 }
 
 // HttpFetcher is an interface for http fetchers
+//
 //go:generate mockgen -destination=mock/mock_http_fetcher.go -package=mock . HttpFetcher
 type HttpFetcher interface {
 	Fetch(ctx context.Context, job IJob) Response
 }
 
 // HtmlParser is an interface for html parsers
+//
 //go:generate mockgen -destination=mock/mock_parser.go -package=mock . HtmlParser
 type HtmlParser interface {
 	Parse(ctx context.Context, body []byte) (any, error)

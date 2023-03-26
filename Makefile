@@ -7,6 +7,12 @@ help: ## help information about make commands
 vet: ## runs go vet
 	go vet ./...
 
+format: ## runs go fmt
+	gofmt -s -w .
+
+generate: ## runs go generate
+	go generate ./...
+
 test: ## runs the unit tests
 	go test -v -race -timeout 5m ./...
 
@@ -19,5 +25,3 @@ test-cover-report: ## an html report of the coverage statistics
 	go test -v ./... -covermode=count -coverpkg=./... -coverprofile coverage.out
 	go tool cover -html coverage.out -o coverage.html
 	open coverage.html
-
-
