@@ -222,6 +222,7 @@ func (s *scrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 			s.log.Error("error while setting document", "error", err)
 			return
 		}
+		fmt.Println(resp.Document)
 	}
 	ctx = context.WithValue(ctx, "log", s.log.With("jobid", job.GetID()))
 	result, next, err = job.Process(ctx)

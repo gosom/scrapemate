@@ -1,4 +1,4 @@
-package scrapemate
+package goqueryparser
 
 import (
 	"bytes"
@@ -10,7 +10,11 @@ import (
 type GoQueryHtmlParser struct {
 }
 
-func (g *GoQueryHtmlParser) ParseDocument(ctx context.Context, body []byte) (any, error) {
+func New() *GoQueryHtmlParser {
+	return &GoQueryHtmlParser{}
+}
+
+func (g *GoQueryHtmlParser) Parse(ctx context.Context, body []byte) (any, error) {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
 		return nil, err

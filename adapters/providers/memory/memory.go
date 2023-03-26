@@ -8,8 +8,8 @@ import (
 
 var _ scrapemate.JobProvider = (*memoryProvider)(nil)
 
-// NewMemoryProvider creates a new memory provider
-func NewMemoryProvider() *memoryProvider {
+// New creates a new memory provider
+func New() *memoryProvider {
 	return &memoryProvider{
 		p0: make(chan scrapemate.IJob),
 		p1: make(chan scrapemate.IJob),
