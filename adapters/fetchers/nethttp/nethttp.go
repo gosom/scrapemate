@@ -78,6 +78,7 @@ func (o *httpFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.R
 		reader = resp.Body
 	}
 	ans.Body, ans.Error = io.ReadAll(reader)
+	ans.URL = resp.Request.URL.String()
 	return ans
 }
 

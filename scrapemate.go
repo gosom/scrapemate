@@ -222,10 +222,9 @@ func (s *scrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 			s.log.Error("error while setting document", "error", err)
 			return
 		}
-		fmt.Println(resp.Document)
 	}
 	ctx = context.WithValue(ctx, "log", s.log.With("jobid", job.GetID()))
-	result, next, err = job.Process(ctx)
+	result, next, err = job.Process(ctx, resp)
 	if err != nil {
 		// TODO shall I retry?
 		s.log.Error("error while processing job", "error", err)
@@ -354,7 +353,6 @@ func (s *scrapeMate) finishJob(ctx context.Context, job IJob, ans any, next []IJ
 
 func (s *scrapeMate) pushJobs(ctx context.Context, jobs []IJob) error {
 	for i := range jobs {
-		fmt.Println("pushing job", jobs[i])
 		if err := s.jobProvider.Push(ctx, jobs[i]); err != nil {
 			return err
 		}

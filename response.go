@@ -7,6 +7,7 @@ import (
 
 // Response is the struct that it is returned when crawling finishes
 type Response struct {
+	URL        string
 	StatusCode int
 	Headers    http.Header
 	Duration   time.Duration

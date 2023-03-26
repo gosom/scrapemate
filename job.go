@@ -34,7 +34,7 @@ type IJob interface {
 	// GetMaxRetries returns the max retries of the job
 	GetMaxRetries() int
 	// Process processes the job
-	Process(ctx context.Context) (any, []IJob, error)
+	Process(ctx context.Context, resp Response) (any, []IJob, error)
 	// GetMaxRetryDelay returns the delay to wait before retrying
 	GetMaxRetryDelay() time.Duration
 }
@@ -76,9 +76,6 @@ type Job struct {
 	// for a MaxRetries numbers of time. If the sleep time between the retries is more than
 	// MaxRetryDelay then it's capped to that. (Default is 2 seconds)
 	MaxRetryDelay time.Duration
-
-	// Response is the actual response
-	Response Response
 }
 
 // String returns the string representation of the job
@@ -87,7 +84,7 @@ func (j *Job) String() string {
 }
 
 // Process processes the job
-func (j *Job) Process(ctx context.Context) (any, []IJob, error) {
+func (j *Job) Process(ctx context.Context, resp Response) (any, []IJob, error) {
 	return nil, nil, nil
 }
 

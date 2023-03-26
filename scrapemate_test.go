@@ -482,7 +482,7 @@ type testJobWithError struct {
 	scrapemate.Job
 }
 
-func (j *testJobWithError) Process(ctx context.Context) (any, []scrapemate.IJob, error) {
+func (j *testJobWithError) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
 	return nil, nil, errors.New("error processing")
 }
 
@@ -490,7 +490,7 @@ type testJobWithNext struct {
 	scrapemate.Job
 }
 
-func (j *testJobWithNext) Process(ctx context.Context) (any, []scrapemate.IJob, error) {
+func (j *testJobWithNext) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
 	next := &testJob{
 		Job: scrapemate.Job{
 			URL: "http://example.com/next",
@@ -503,7 +503,7 @@ type testJob struct {
 	scrapemate.Job
 }
 
-func (j *testJob) Process(ctx context.Context) (any, []scrapemate.IJob, error) {
+func (j *testJob) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
 	return nil, nil, nil
 }
 
