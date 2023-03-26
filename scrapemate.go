@@ -303,7 +303,7 @@ func (s *scrapeMate) waitForSignal(sigChan <-chan os.Signal) {
 		select {
 		case <-sigChan:
 			s.log.Info("received signal, shutting down")
-			s.cancelFn(errors.New("received signal"))
+			s.cancelFn(ErrorExitSignal)
 		}
 	}()
 }
