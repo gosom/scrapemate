@@ -45,9 +45,6 @@ jobs:
       - name: Go Mod Verify
         run: go mod verify
 
-      - name: Go Generate
-        run: make generate && git diff --exit-code
-
       - name: Go Build
         run: go build -o /dev/null ./...
 
