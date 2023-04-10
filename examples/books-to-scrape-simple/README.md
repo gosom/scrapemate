@@ -43,5 +43,11 @@ In that case we also need to generate screenshots for each product and save them
 a folder name `screenshots`. Each screenshot will have the name `{UPC}.png`, where UPC is the product
 identifier as parsed
 
+## Caching
+
+Use the flag `-file-cache` . This flag will create a folder `__cache` and it will store the 
+cached responses. The first time you will use this cache the cache is empty and the pages will be crawled.
+The second time you use it the data will be read from the `__cache` directory. 
+
 
 

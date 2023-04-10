@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/gosom/scrapemate"
+	cache "github.com/gosom/scrapemate/adapters/cache/filecache"
 	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
@@ -37,7 +38,9 @@ func run() error {
 	defer cancel(errors.New("deferred cancel"))
 
 	var useJS bool
+	var useFileCache bool
 	flag.BoolVar(&useJS, "js", false, "use javascript")
+	flag.BoolVar(&useFileCache, "file-cache", false, "use file cache")
 	flag.Parse()
 	// create a new memory provider
 	provider := provider.New()
@@ -85,6 +88,16 @@ func run() error {
 
 	if err != nil {
 		return err
+	}
+	if useFileCache {
+		cacher, err := cache.NewFileCache("__cache")
+		if err != nil {
+			return err
+		}
+		fn := scrapemate.WithCache(cacher)
+		if err := fn(mate); err != nil {
+			return err
+		}
 	}
 
 	// process the results here
