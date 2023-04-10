@@ -17,4 +17,6 @@ var (
 	ErrorNoHttpFetcher = errors.New("no http fetcher set")
 	// ErrorNoHtmlParser returned when you try to initialized with a nil HtmlParser
 	ErrorNoHtmlParser = errors.New("no html parser set")
+	// ErrorNoCacher returned when you try to initialized with a nil Cacher
+	ErrorNoCacher = errors.New("no cacher set")
 )

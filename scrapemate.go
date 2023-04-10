@@ -122,6 +122,17 @@ func WithHtmlParser(parser HtmlParser) func(*scrapeMate) error {
 	}
 }
 
+// WithCache sets the cache for the scrapemate
+func WithCache(cache Cacher) func(*scrapeMate) error {
+	return func(s *scrapeMate) error {
+		if cache == nil {
+			return ErrorNoCacher
+		}
+		s.cache = cache
+		return nil
+	}
+}
+
 // Result is the struct items of which the Results channel has
 type Result struct {
 	Job  IJob
@@ -137,6 +148,7 @@ type scrapeMate struct {
 	concurrency int
 	httpFetcher HttpFetcher
 	htmlParser  HtmlParser
+	cache       Cacher
 	results     chan Result
 	failedJobs  chan IJob
 }
@@ -208,13 +220,32 @@ func (s *scrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 		s.log.Info("job finished", args...)
 	}()
 
-	resp = s.doFetch(ctx, job)
-	if resp.Error != nil {
-		err = resp.Error
-		return
+	var cached bool
+	cacheKey := job.GetCacheKey()
+	if s.cache != nil {
+		var err error
+		resp, err = s.cache.Get(ctx, cacheKey)
+		if err == nil {
+			cached = true
+		}
 	}
 
-	// cache the response if needed
+	switch {
+	case cached:
+		s.log.Debug("using cached response", "job", job)
+	default:
+		resp = s.doFetch(ctx, job)
+		if resp.Error != nil {
+			err = resp.Error
+			return
+		}
+		if s.cache != nil {
+			if err := s.cache.Set(ctx, cacheKey, resp); err != nil {
+				s.log.Error("error while caching response", "error", err, "job", job)
+			}
+		}
+	}
+
 	// process the response
 	if s.htmlParser != nil {
 		resp.Document, err = s.htmlParser.Parse(ctx, resp.Body)

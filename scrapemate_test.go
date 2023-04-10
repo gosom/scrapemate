@@ -19,6 +19,7 @@ type mockedServices struct {
 	provider *mock.MockJobProvider
 	fetcher  *mock.MockHttpFetcher
 	parser   *mock.MockHtmlParser
+	cache    *mock.MockCacher
 }
 
 func getMockedServices(t *testing.T) *mockedServices {
@@ -26,10 +27,12 @@ func getMockedServices(t *testing.T) *mockedServices {
 	httpFetcher := mock.NewMockHttpFetcher(mockCtrl)
 	provider := mock.NewMockJobProvider(mockCtrl)
 	parser := mock.NewMockHtmlParser(mockCtrl)
+	cache := mock.NewMockCacher(mockCtrl)
 	return &mockedServices{
 		provider: provider,
 		fetcher:  httpFetcher,
 		parser:   parser,
+		cache:    cache,
 	}
 }
 
@@ -159,6 +162,23 @@ func Test_New_With_Options(t *testing.T) {
 				scrapemate.WithJobProvider(svc.provider),
 				scrapemate.WithHttpFetcher(svc.fetcher),
 				scrapemate.WithHtmlParser(nil),
+			)
+			require.Error(t, err)
+		})
+	})
+	t.Run("with cache", func(t *testing.T) {
+		mate, err := scrapemate.New(
+			scrapemate.WithJobProvider(svc.provider),
+			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithCache(svc.cache),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, mate)
+		t.Run("with nil cache", func(t *testing.T) {
+			_, err := scrapemate.New(
+				scrapemate.WithJobProvider(svc.provider),
+				scrapemate.WithHttpFetcher(svc.fetcher),
+				scrapemate.WithCache(nil),
 			)
 			require.Error(t, err)
 		})
@@ -656,6 +676,45 @@ func Test_DoJob(t *testing.T) {
 			StatusCode: 200,
 			Body:       []byte("<html"),
 		})
+		svc.parser.EXPECT().Parse(ctx, gomock.Any()).Return(nil, errors.New("test"))
+		_, _, err = mate.DoJob(ctx, &job)
+		require.Error(t, err)
+	})
+	t.Run("success+cache+parseError", func(t *testing.T) {
+		mate, err := scrapemate.New(
+			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithJobProvider(svc.provider),
+			scrapemate.WithHtmlParser(svc.parser),
+			scrapemate.WithCache(svc.cache),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, mate)
+		svc.cache.EXPECT().Get(ctx, job.GetCacheKey()).Return(scrapemate.Response{
+			StatusCode: 200,
+			Body:       []byte("<html></html>"),
+		}, nil)
+		svc.parser.EXPECT().Parse(ctx, gomock.Any()).Return(nil, errors.New("test"))
+		_, _, err = mate.DoJob(ctx, &job)
+		require.Error(t, err)
+	})
+	t.Run("success+cacheError+parseError", func(t *testing.T) {
+		mate, err := scrapemate.New(
+			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithJobProvider(svc.provider),
+			scrapemate.WithHtmlParser(svc.parser),
+			scrapemate.WithCache(svc.cache),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, mate)
+		svc.cache.EXPECT().Get(ctx, job.GetCacheKey()).Return(scrapemate.Response{
+			StatusCode: 200,
+			Body:       []byte("<html></html>"),
+		}, errors.New("cache error"))
+		svc.fetcher.EXPECT().Fetch(ctx, &job).Return(scrapemate.Response{
+			StatusCode: 200,
+			Body:       []byte("<html"),
+		})
+		svc.cache.EXPECT().Set(ctx, job.GetCacheKey(), gomock.Any()).Return(nil)
 		svc.parser.EXPECT().Parse(ctx, gomock.Any()).Return(nil, errors.New("test"))
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)

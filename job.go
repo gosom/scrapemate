@@ -2,8 +2,12 @@ package scrapemate
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/url"
+	"sort"
 	"time"
 
 	"github.com/playwright-community/playwright-go"
@@ -44,6 +48,8 @@ type IJob interface {
 	// DoScreenshot takes a screenshot of the page
 	// Only works if the scraper uses jsfetcher
 	DoScreenshot() bool
+	// GetCacheKey returns the key to use for caching
+	GetCacheKey() string
 }
 
 // Job is the base job that we may use
@@ -86,6 +92,27 @@ type Job struct {
 	//TakeScreenshot if true takes a screenshot of the page
 	TakeScreenshot bool
 	Response       Response
+}
+
+// GetCacheKey returns the key to use for caching
+func (j *Job) GetCacheKey() string {
+	urlvals := url.Values{}
+	keys := make([]string, 0, len(j.UrlParams))
+	for k, _ := range j.UrlParams {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		urlvals.Add(k, j.UrlParams[k])
+	}
+	u := j.GetURL() + urlvals.Encode()
+	toHash := fmt.Sprintf("%s:%s", j.GetMethod(), u)
+	if j.GetMethod() == http.MethodPost {
+		toHash += string(j.GetBody())
+	}
+	hashValue := md5.Sum([]byte(toHash))
+	cacheKey := hex.EncodeToString(hashValue[:])
+	return cacheKey
 }
 
 // DoScreenshot used to check if we need a screenshot

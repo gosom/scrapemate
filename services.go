@@ -28,3 +28,11 @@ type HttpFetcher interface {
 type HtmlParser interface {
 	Parse(ctx context.Context, body []byte) (any, error)
 }
+
+// Cacher is an interface for cache
+//
+//go:generate mockgen -destination=mock/mock_cacher.go -package=mock . Cacher
+type Cacher interface {
+	Get(ctx context.Context, key string) (Response, error)
+	Set(ctx context.Context, key string, value Response) error
+}
