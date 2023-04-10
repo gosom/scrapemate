@@ -45,9 +45,12 @@ identifier as parsed
 
 ## Caching
 
-Use the flag `-file-cache` . This flag will create a folder `__cache` and it will store the 
-cached responses. The first time you will use this cache the cache is empty and the pages will be crawled.
-The second time you use it the data will be read from the `__cache` directory. 
+Use the flag `-cache`. 
+It accepts one of `file`,  `leveldb`
 
+If you use `leveldb` then it creates a folder `__leveldb_cache` that contains the cached responses.
+If you use `file` then it creates a folder `__file_cache` that contains the cached responses (1 file per response). 
+The first time you will use this cache the cache is empty and the pages will be crawled.
 
+The second time you use it the data will be read from the cache
 

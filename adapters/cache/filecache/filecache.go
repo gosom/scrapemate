@@ -70,3 +70,8 @@ func (c *FileCache) Set(ctx context.Context, key string, value scrapemate.Respon
 	}
 	return nil
 }
+
+// Close closes the file cache
+func (c *FileCache) Close() error {
+	return nil
+}

@@ -33,6 +33,7 @@ type HtmlParser interface {
 //
 //go:generate mockgen -destination=mock/mock_cacher.go -package=mock . Cacher
 type Cacher interface {
+	Close() error
 	Get(ctx context.Context, key string) (Response, error)
 	Set(ctx context.Context, key string, value Response) error
 }

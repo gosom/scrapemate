@@ -13,7 +13,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/gosom/scrapemate"
-	cache "github.com/gosom/scrapemate/adapters/cache/filecache"
+	"github.com/gosom/scrapemate/adapters/cache/filecache"
+	"github.com/gosom/scrapemate/adapters/cache/leveldbcache"
 	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
@@ -38,9 +39,11 @@ func run() error {
 	defer cancel(errors.New("deferred cancel"))
 
 	var useJS bool
-	var useFileCache bool
+	var cacheType string
+	var concurrency int
 	flag.BoolVar(&useJS, "js", false, "use javascript")
-	flag.BoolVar(&useFileCache, "file-cache", false, "use file cache")
+	flag.StringVar(&cacheType, "cache", "", "use cache of type: file,leveldb DEFAULT: no cache")
+	flag.IntVar(&concurrency, "concurrency", 10, "concurrency")
 	flag.Parse()
 	// create a new memory provider
 	provider := provider.New()
@@ -82,18 +85,29 @@ func run() error {
 		scrapemate.WithContext(ctx, cancel),
 		scrapemate.WithJobProvider(provider),
 		scrapemate.WithHttpFetcher(httpFetcher),
-		scrapemate.WithConcurrency(10),
+		scrapemate.WithConcurrency(concurrency),
 		scrapemate.WithHtmlParser(parser.New()),
 	)
 
 	if err != nil {
 		return err
 	}
-	if useFileCache {
-		cacher, err := cache.NewFileCache("__cache")
+
+	var cacher scrapemate.Cacher
+	switch cacheType {
+	case "file":
+		cacher, err = filecache.NewFileCache("__file_cache")
 		if err != nil {
 			return err
 		}
+	case "leveldb":
+		cacher, err = leveldbcache.NewLevelDBCache("__leveldb_cache")
+		if err != nil {
+			return err
+		}
+	}
+	if cacher != nil {
+		defer cacher.Close()
 		fn := scrapemate.WithCache(cacher)
 		if err := fn(mate); err != nil {
 			return err

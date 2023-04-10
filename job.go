@@ -98,7 +98,7 @@ type Job struct {
 func (j *Job) GetCacheKey() string {
 	urlvals := url.Values{}
 	keys := make([]string, 0, len(j.UrlParams))
-	for k, _ := range j.UrlParams {
+	for k := range j.UrlParams {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
