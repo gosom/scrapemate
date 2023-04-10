@@ -35,6 +35,20 @@ func (m *MockCacher) EXPECT() *MockCacherMockRecorder {
 	return m.recorder
 }
 
+// Close mocks base method.
+func (m *MockCacher) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockCacherMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockCacher)(nil).Close))
+}
+
 // Get mocks base method.
 func (m *MockCacher) Get(arg0 context.Context, arg1 string) (scrapemate.Response, error) {
 	m.ctrl.T.Helper()
