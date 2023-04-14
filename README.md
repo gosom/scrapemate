@@ -21,6 +21,8 @@ See the examples folder.
 
 There is an example how to scrape data from [books.toscrape.com](https://github.com/gosom/scrapemate/tree/main/examples/books-to-scrape-simple)
 
+there is a blog post with a tutorial here https://blog.gkomninos.com/getting-started-with-web-scraping-using-golang-and-scrapemate
+
 
 ## Contributing
 
