@@ -48,7 +48,7 @@ func (app *ScrapemateApp) Start(ctx context.Context, seedJobs ...scrapemate.IJob
 	}
 	defer app.Close()
 
-	for i, _ := range app.cfg.Writers {
+	for i := range app.cfg.Writers {
 		writer := app.cfg.Writers[i]
 		g.Go(func() error {
 			if err := writer.Run(ctx, mate.Results()); err != nil {
@@ -64,7 +64,7 @@ func (app *ScrapemateApp) Start(ctx context.Context, seedJobs ...scrapemate.IJob
 	})
 
 	g.Go(func() error {
-		for i, _ := range seedJobs {
+		for i := range seedJobs {
 			if err := app.provider.Push(ctx, seedJobs[i]); err != nil {
 				return err
 			}
