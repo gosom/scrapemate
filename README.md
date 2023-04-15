@@ -8,21 +8,22 @@ Scrapemate is a web crawling and scraping framework written in Golang. It is des
 
 ## Features
 
-- Simple API
+- Low level API & Easy High Level API
 - Customizable retry and error handling
 - Javascript Rendering with ability to control the browser
 - Screenshots support (when JS rendering is enabled)
 - Capability to write your own result exporter
+- Capability to write results in multiple sinks
+- Default CSV writer
 - Caching (File/LevelDB/Custom)
+- Custom job providers (memory provider included)
 
 ## Usage
 
-See the examples folder.
+For the High Level API see this [example](https://github.com/gosom/scrapemate/tree/main/examples/quotes-to-scrape-app)
 
-There is an example how to scrape data from [books.toscrape.com](https://github.com/gosom/scrapemate/tree/main/examples/books-to-scrape-simple)
-
-there is a blog post with a tutorial here https://blog.gkomninos.com/getting-started-with-web-scraping-using-golang-and-scrapemate
-
+For the Low Level API see [books.toscrape.com](https://github.com/gosom/scrapemate/tree/main/examples/books-to-scrape-simple)
+Additionally, for low level API you can read [the blogpost](https://blog.gkomninos.com/getting-started-with-web-scraping-using-golang-and-scrapemate)
 
 ## Contributing
 
