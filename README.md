@@ -22,7 +22,7 @@ Scrapemate is a web crawling and scraping framework written in Golang. It is des
 
 For the High Level API see this [example](https://github.com/gosom/scrapemate/tree/main/examples/quotes-to-scrape-app).
 
-Read also (how to use high level api)[https://blog.gkomninos.com/golang-web-scraping-using-scrapemate]
+Read also [how to use high level api](https://blog.gkomninos.com/golang-web-scraping-using-scrapemate)
 
 For the Low Level API see [books.toscrape.com](https://github.com/gosom/scrapemate/tree/main/examples/books-to-scrape-simple)
 
