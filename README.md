@@ -18,11 +18,14 @@ Scrapemate is a web crawling and scraping framework written in Golang. It is des
 - Caching (File/LevelDB/Custom)
 - Custom job providers (memory provider included)
 
-## Quickstart
+## Installation
 
 ```
 go get github.com/gosom/scrapemate
 ```
+
+## Quickstart
+
 
 ```go
 package main
@@ -113,7 +116,14 @@ func (c Country) CsvRow() []string {
 
 ```
 
-## Usage
+```
+go mod tidy
+go run main.go 1>countries.csv
+```
+
+(hit CTRL-C to exit)
+
+## Documentation
 
 For the High Level API see this [example](https://github.com/gosom/scrapemate/tree/main/examples/quotes-to-scrape-app).
 
