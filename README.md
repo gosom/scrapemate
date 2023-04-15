@@ -18,6 +18,101 @@ Scrapemate is a web crawling and scraping framework written in Golang. It is des
 - Caching (File/LevelDB/Custom)
 - Custom job providers (memory provider included)
 
+## Quickstart
+
+```
+go get github.com/gosom/scrapemate
+```
+
+```go
+package main
+
+import (
+	"context"
+	"encoding/csv"
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/gosom/scrapemate"
+	"github.com/gosom/scrapemate/adapters/writers/csvwriter"
+	"github.com/gosom/scrapemate/scrapemateapp"
+)
+
+func main() {
+	csvWriter := csvwriter.NewCsvWriter(csv.NewWriter(os.Stdout))
+
+	cfg, err := scrapemateapp.NewConfig(
+		[]scrapemate.ResultWriter{csvWriter},
+	)
+	if err != nil {
+		panic(err)
+	}
+	app, err := scrapemateapp.NewScrapeMateApp(cfg)
+	if err != nil {
+		panic(err)
+	}
+	seedJobs := []scrapemate.IJob{
+		&SimpleCountryJob{
+			Job: scrapemate.Job{
+				ID:     "identity",
+				Method: http.MethodGet,
+				URL:    "https://www.scrapethissite.com/pages/simple/",
+				Headers: map[string]string{
+					"User-Agent": scrapemate.DefaultUserAgent,
+				},
+				Timeout:    10 * time.Second,
+				MaxRetries: 3,
+			},
+		},
+	}
+	err = app.Start(context.Background(), seedJobs...)
+	if err != nil && err != scrapemate.ErrorExitSignal {
+		panic(err)
+	}
+}
+
+type SimpleCountryJob struct {
+	scrapemate.Job
+}
+
+func (j *SimpleCountryJob) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
+	doc, ok := resp.Document.(*goquery.Document)
+	if !ok {
+		return nil, nil, fmt.Errorf("failed to cast response document to goquery document")
+	}
+	var countries []Country
+	doc.Find("div.col-md-4.country").Each(func(i int, s *goquery.Selection) {
+		var country Country
+		country.Name = strings.TrimSpace(s.Find("h3.country-name").Text())
+		country.Capital = strings.TrimSpace(s.Find("div.country-info span.country-capital").Text())
+		country.Population = strings.TrimSpace(s.Find("div.country-info span.country-population").Text())
+		country.Area = strings.TrimSpace(s.Find("div.country-info span.country-area").Text())
+		countries = append(countries, country)
+	})
+	return countries, nil, nil
+}
+
+type Country struct {
+	Name       string
+	Capital    string
+	Population string
+	Area       string
+}
+
+func (c Country) CsvHeaders() []string {
+	return []string{"Name", "Capital", "Population", "Area"}
+}
+
+func (c Country) CsvRow() []string {
+	return []string{c.Name, c.Capital, c.Population, c.Area}
+}
+
+```
+
 ## Usage
 
 For the High Level API see this [example](https://github.com/gosom/scrapemate/tree/main/examples/quotes-to-scrape-app).
