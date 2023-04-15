@@ -37,3 +37,10 @@ type Cacher interface {
 	Get(ctx context.Context, key string) (Response, error)
 	Set(ctx context.Context, key string, value Response) error
 }
+
+// ResultWriter is an interface for result writers
+//
+//go:generate mockgen -destination=mock/mock_writer.go -package=mock . ResultWriter
+type ResultWriter interface {
+	Run(ctx context.Context, in <-chan Result) error
+}

@@ -1,0 +1,32 @@
+module githbub.com/gosom/scrapemate/quotestoscrapeapp
+
+go 1.20
+
+require github.com/gosom/scrapemate v0.0.0-00010101000000-000000000000
+
+require (
+	github.com/PuerkitoBio/goquery v1.8.1 // indirect
+	github.com/andybalholm/cascadia v1.3.1 // indirect
+	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964 // indirect
+	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/go-playground/validator/v10 v10.12.0 // indirect
+	github.com/go-stack/stack v1.8.1 // indirect
+	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
+	github.com/google/uuid v1.3.0 // indirect
+	github.com/gosom/kit v0.0.0-20230309082109-543b32ac686a // indirect
+	github.com/leodido/go-urn v1.2.2 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/playwright-community/playwright-go v0.2000.1 // indirect
+	github.com/rs/zerolog v1.28.0 // indirect
+	github.com/syndtr/goleveldb v1.0.0 // indirect
+	golang.org/x/crypto v0.7.0 // indirect
+	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/sync v0.1.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/text v0.9.0 // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
+)
+
+replace github.com/gosom/scrapemate => ../../

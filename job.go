@@ -50,6 +50,8 @@ type IJob interface {
 	DoScreenshot() bool
 	// GetCacheKey returns the key to use for caching
 	GetCacheKey() string
+	// UseInResults returns true if the job should be used in the results
+	UseInResults() bool
 }
 
 // Job is the base job that we may use
@@ -92,6 +94,11 @@ type Job struct {
 	//TakeScreenshot if true takes a screenshot of the page
 	TakeScreenshot bool
 	Response       Response
+}
+
+// UseInResults returns true if the job should be used in the results
+func (j *Job) UseInResults() bool {
+	return true
 }
 
 // GetCacheKey returns the key to use for caching
