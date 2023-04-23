@@ -44,9 +44,12 @@ func WithCache(cacheType, cachePath string) func(*config) error {
 }
 
 // WithJS sets the app to use JavaScript to render the pages.
-func WithJS() func(*config) error {
+func WithJS(opts ...func(*jsOptions)) func(*config) error {
 	return func(o *config) error {
 		o.UseJS = true
+		for _, opt := range opts {
+			opt(&o.JSOpts)
+		}
 		return o.validate()
 	}
 }
@@ -60,6 +63,20 @@ func WithProvider(provider scrapemate.JobProvider) func(*config) error {
 		o.Provider = provider
 		return nil
 	}
+}
+
+// Headfull is a helper function to create a headfull browser.
+// Use it as a parameter to WithJS.
+func Headfull() func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.Headfull = true
+	}
+}
+
+type jsOptions struct {
+	// Headfull is a flag to run the browser in headfull mode.
+	// By default, the browser is run in headless mode.
+	Headfull bool
 }
 
 type config struct {
@@ -77,6 +94,8 @@ type config struct {
 
 	// UseJS is whether to use JavaScript to render the page.
 	UseJS bool `validate:"omitempty"`
+	// JSOpts are the options for the JavaScript renderer.
+	JSOpts jsOptions
 
 	// ProviderType is the type of provider to use.
 	// It is required to be a valid type if Provider is set.

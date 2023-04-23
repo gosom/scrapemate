@@ -56,6 +56,15 @@ func Test_NewConfig(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, cfg.UseJS)
 	})
+	t.Run("with js and headfull", func(t *testing.T) {
+		cfg, err := scrapemateapp.NewConfig(
+			[]scrapemate.ResultWriter{resultwriter},
+			scrapemateapp.WithJS(scrapemateapp.Headfull()),
+		)
+		require.NoError(t, err)
+		require.True(t, cfg.UseJS)
+		require.True(t, cfg.JSOpts.Headfull)
+	})
 	t.Run("with invalid provider", func(t *testing.T) {
 		_, err := scrapemateapp.NewConfig(
 			[]scrapemate.ResultWriter{resultwriter},
