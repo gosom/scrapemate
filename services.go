@@ -19,6 +19,7 @@ type JobProvider interface {
 //
 //go:generate mockgen -destination=mock/mock_http_fetcher.go -package=mock . HttpFetcher
 type HttpFetcher interface {
+	Session(ctx context.Context) (any, error)
 	Fetch(ctx context.Context, job IJob) Response
 }
 

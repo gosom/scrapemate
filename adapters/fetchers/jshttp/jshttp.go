@@ -39,33 +39,75 @@ type jsFetch struct {
 	browser playwright.Browser
 }
 
+func (o *jsFetch) Session(ctx context.Context) (any, error) {
+	bctx, err := newBrowserCtx(o.browser)
+	if err != nil {
+		return nil, err
+	}
+	return bctx, nil
+}
+
 // Fetch fetches the url specicied by the job and returns the response
 func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
-	browserCtx, err := o.browser.NewContext()
-	if err != nil {
-		return scrapemate.Response{Error: err}
+	browser, ok := GetBrowserFromContext(ctx)
+	if !ok {
+		var err error
+		browser, err = newBrowserCtx(o.browser)
+		if err != nil {
+			return scrapemate.Response{
+				Error: err,
+			}
+		}
 	}
+	browser.usage++
+	defer func() {
+		pages := browser.bwctx.Pages()
+		if len(pages) >= 2 {
+			for i := 0; i < len(pages)-2; i++ {
+				pages[i].Close()
+			}
+		}
+		for _, page := range browser.bwctx.BackgroundPages() {
+			page.Close()
+		}
+	}()
 	if job.GetTimeout() > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, job.GetTimeout())
 		defer cancel()
 	}
-	page, err := o.newPage(browserCtx)
-	if err != nil {
-		return scrapemate.Response{Error: err}
-	}
-	defer page.Close()
-
-	return job.BrowserActions(ctx, page)
+	return job.BrowserActions(ctx, browser.page)
 }
 
-func (o *jsFetch) newPage(bctx playwright.BrowserContext) (playwright.Page, error) {
+func GetBrowserFromContext(ctx context.Context) (browserCtx, bool) {
+	bctx, ok := ctx.Value("session").(browserCtx)
+	return bctx, ok
+}
+
+type browserCtx struct {
+	bwctx playwright.BrowserContext
+	page  playwright.Page
+	usage int
+}
+
+func newBrowserCtx(browser playwright.Browser) (browserCtx, error) {
+	bctx, err := browser.NewContext(playwright.BrowserNewContextOptions{
+		Viewport: &playwright.BrowserNewContextOptionsViewport{
+			Width:  playwright.Int(1920),
+			Height: playwright.Int(1080),
+		},
+	})
+	if err != nil {
+		return browserCtx{}, err
+	}
 	page, err := bctx.NewPage()
 	if err != nil {
-		return nil, err
+		return browserCtx{}, err
 	}
-	if err := page.SetViewportSize(1920, 1080); err != nil {
-		return nil, err
+	ans := browserCtx{
+		bwctx: bctx,
+		page:  page,
+		usage: 0,
 	}
-	return page, nil
+	return ans, nil
 }

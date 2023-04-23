@@ -286,8 +286,8 @@ func Test_Start(t *testing.T) {
 			ans := make(chan scrapemate.IJob)
 			return ans
 		}()
-		svc.provider.EXPECT().Jobs(ctx).Return(nil, errch)
-		svc.provider.EXPECT().Jobs(ctx).Return(ch, nil)
+		svc.provider.EXPECT().Jobs(gomock.Any()).Return(nil, errch)
+		svc.provider.EXPECT().Jobs(gomock.Any()).Return(ch, nil)
 
 		mateErr := func() <-chan error {
 			errc := make(chan error)
@@ -328,7 +328,7 @@ func Test_Start(t *testing.T) {
 			return ans
 		}()
 		svc.provider.EXPECT().Jobs(ctx).Return(ch, errch)
-		svc.fetcher.EXPECT().Fetch(ctx, gomock.Any()).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("test"),
 		})
@@ -380,7 +380,7 @@ func Test_Start(t *testing.T) {
 			return ans
 		}()
 		svc.provider.EXPECT().Jobs(ctx).Return(jobCh, errch)
-		svc.fetcher.EXPECT().Fetch(ctx, gomock.Any()).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("test"),
 		})
@@ -388,7 +388,7 @@ func Test_Start(t *testing.T) {
 			jobCh <- job
 			return nil
 		})
-		svc.fetcher.EXPECT().Fetch(ctx, gomock.Any()).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("test"),
 		})
@@ -459,7 +459,7 @@ func Test_Start(t *testing.T) {
 			return ans
 		}()
 		svc.provider.EXPECT().Jobs(ctx).Return(ch, errch)
-		svc.fetcher.EXPECT().Fetch(ctx, gomock.Any()).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("test"),
 		})
@@ -539,7 +539,7 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
-		svc.fetcher.EXPECT().Fetch(ctx, &job).Do(func(ctx context.Context, job *scrapemate.Job) {
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job).Do(func(ctx context.Context, job *scrapemate.Job) {
 			panic("test")
 		})
 		_, _, err = mate.DoJob(ctx, &job)
@@ -552,7 +552,7 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
-		svc.fetcher.EXPECT().Fetch(ctx, &job).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job).Return(scrapemate.Response{
 			StatusCode: 400,
 			Body:       []byte("test"),
 		})
@@ -568,7 +568,7 @@ func Test_DoJob(t *testing.T) {
 		require.NotNil(t, mate)
 		job2 := job
 		job2.MaxRetries = 1
-		svc.fetcher.EXPECT().Fetch(ctx, &job2).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job2).Return(scrapemate.Response{
 			StatusCode: 400,
 			Body:       []byte("test"),
 		}).Times(2)
@@ -585,7 +585,7 @@ func Test_DoJob(t *testing.T) {
 		job2 := job
 		job2.MaxRetries = 10
 		job2.MaxRetryDelay = 600 * time.Millisecond
-		svc.fetcher.EXPECT().Fetch(ctx, &job2).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job2).Return(scrapemate.Response{
 			StatusCode: 400,
 			Body:       []byte("test"),
 		}).Times(6)
@@ -605,7 +605,7 @@ func Test_DoJob(t *testing.T) {
 				return response.StatusCode == 301
 			},
 		}
-		svc.fetcher.EXPECT().Fetch(ctx, &job2).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job2).Return(scrapemate.Response{
 			StatusCode: 301,
 			Body:       []byte("test"),
 		})
@@ -623,7 +623,7 @@ func Test_DoJob(t *testing.T) {
 			URL:         "http://example.com",
 			RetryPolicy: scrapemate.StopScraping,
 		}
-		svc.fetcher.EXPECT().Fetch(ctx, &job2).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job2).Return(scrapemate.Response{
 			StatusCode: 400,
 			Body:       []byte("test"),
 		})
@@ -650,7 +650,7 @@ func Test_DoJob(t *testing.T) {
 			URL:         "http://example.com",
 			RetryPolicy: scrapemate.DiscardJob,
 		}
-		svc.fetcher.EXPECT().Fetch(ctx, &job2).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job2).Return(scrapemate.Response{
 			StatusCode: 400,
 			Body:       []byte("test"),
 		})
@@ -672,11 +672,11 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
-		svc.fetcher.EXPECT().Fetch(ctx, &job).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("<html"),
 		})
-		svc.parser.EXPECT().Parse(ctx, gomock.Any()).Return(nil, errors.New("test"))
+		svc.parser.EXPECT().Parse(gomock.Any(), gomock.Any()).Return(nil, errors.New("test"))
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
 	})
@@ -689,11 +689,11 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
-		svc.cache.EXPECT().Get(ctx, job.GetCacheKey()).Return(scrapemate.Response{
+		svc.cache.EXPECT().Get(gomock.Any(), job.GetCacheKey()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("<html></html>"),
 		}, nil)
-		svc.parser.EXPECT().Parse(ctx, gomock.Any()).Return(nil, errors.New("test"))
+		svc.parser.EXPECT().Parse(gomock.Any(), gomock.Any()).Return(nil, errors.New("test"))
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
 	})
@@ -706,16 +706,16 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
-		svc.cache.EXPECT().Get(ctx, job.GetCacheKey()).Return(scrapemate.Response{
+		svc.cache.EXPECT().Get(gomock.Any(), job.GetCacheKey()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("<html></html>"),
 		}, errors.New("cache error"))
-		svc.fetcher.EXPECT().Fetch(ctx, &job).Return(scrapemate.Response{
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("<html"),
 		})
-		svc.cache.EXPECT().Set(ctx, job.GetCacheKey(), gomock.Any()).Return(nil)
-		svc.parser.EXPECT().Parse(ctx, gomock.Any()).Return(nil, errors.New("test"))
+		svc.cache.EXPECT().Set(gomock.Any(), job.GetCacheKey(), gomock.Any()).Return(nil)
+		svc.parser.EXPECT().Parse(gomock.Any(), gomock.Any()).Return(nil, errors.New("test"))
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
 	})

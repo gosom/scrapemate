@@ -134,6 +134,16 @@ func WithCache(cache Cacher) func(*ScrapeMate) error {
 	}
 }
 
+// WithSession sets the session for the scrapemate
+// At the moment this only works when you use the WithJS option
+// for the html fetcher it has not effect
+func WithSession() func(*ScrapeMate) error {
+	return func(s *ScrapeMate) error {
+		s.useSession = true
+		return nil
+	}
+}
+
 // Scrapemate contains unexporter fields
 type ScrapeMate struct {
 	log         logging.Logger
@@ -146,6 +156,7 @@ type ScrapeMate struct {
 	cache       Cacher
 	results     chan Result
 	failedJobs  chan IJob
+	useSession  bool
 }
 
 // Start starts the scraper
@@ -336,7 +347,8 @@ func (s *ScrapeMate) waitForSignal(sigChan <-chan os.Signal) {
 }
 
 func (s *ScrapeMate) startWorker(ctx context.Context) {
-	jobc, errc := s.jobProvider.Jobs(ctx)
+	wCtx := s.session(ctx)
+	jobc, errc := s.jobProvider.Jobs(wCtx)
 	for {
 		select {
 		case <-ctx.Done():
@@ -344,20 +356,33 @@ func (s *ScrapeMate) startWorker(ctx context.Context) {
 		case err := <-errc:
 			s.log.Error("error while getting jobs...going to wait a bit", "error", err)
 			time.Sleep(1 * time.Second)
-			jobc, errc = s.jobProvider.Jobs(ctx)
+			jobc, errc = s.jobProvider.Jobs(wCtx)
 			s.log.Info("restarted job provider")
 		case job := <-jobc:
-			ans, next, err := s.DoJob(ctx, job)
+			ans, next, err := s.DoJob(wCtx, job)
 			if err != nil {
 				s.log.Error("error while processing job", "error", err)
 				s.pushToFailedJobs(job)
 				continue
 			}
-			if err := s.finishJob(ctx, job, ans, next); err != nil {
+			if err := s.finishJob(wCtx, job, ans, next); err != nil {
 				s.log.Error("error while finishing job", "error", err)
 				s.pushToFailedJobs(job)
 			}
 		}
+	}
+}
+
+func (s *ScrapeMate) session(ctx context.Context) context.Context {
+	switch s.useSession {
+	case true:
+		session, err := s.httpFetcher.Session(ctx)
+		if err != nil {
+			return ctx
+		}
+		return context.WithValue(ctx, "session", session)
+	default:
+		return ctx
 	}
 }
 
