@@ -9,11 +9,6 @@ import (
 
 var _ scrapemate.HttpFetcher = (*jsFetch)(nil)
 
-type jsFetch struct {
-	pw      *playwright.Playwright
-	browser playwright.Browser
-}
-
 func New(headless bool) (*jsFetch, error) {
 	if err := playwright.Install(); err != nil {
 		return nil, err
@@ -32,12 +27,45 @@ func New(headless bool) (*jsFetch, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &jsFetch{
+	ans := jsFetch{
 		pw:      pw,
 		browser: browser,
-	}, nil
+	}
+	return &ans, nil
 }
 
+type jsFetch struct {
+	pw      *playwright.Playwright
+	browser playwright.Browser
+}
+
+// Fetch fetches the url specicied by the job and returns the response
 func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
-	return job.BrowserActions(o.browser)
+	browserCtx, err := o.browser.NewContext()
+	if err != nil {
+		return scrapemate.Response{Error: err}
+	}
+	if job.GetTimeout() > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, job.GetTimeout())
+		defer cancel()
+	}
+	page, err := o.newPage(browserCtx)
+	if err != nil {
+		return scrapemate.Response{Error: err}
+	}
+	defer page.Close()
+
+	return job.BrowserActions(ctx, page)
+}
+
+func (o *jsFetch) newPage(bctx playwright.BrowserContext) (playwright.Page, error) {
+	page, err := bctx.NewPage()
+	if err != nil {
+		return nil, err
+	}
+	if err := page.SetViewportSize(1920, 1080); err != nil {
+		return nil, err
+	}
+	return page, nil
 }

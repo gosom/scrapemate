@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -191,6 +192,7 @@ func (s *ScrapeMate) Failed() <-chan IJob {
 
 // DoJob scrapes a job and returns it's result
 func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJob, err error) {
+	ctx = context.WithValue(ctx, "log", s.log.With("jobid", job.GetID()))
 	startTime := time.Now().UTC()
 	s.log.Debug("starting job", "job", job)
 	var resp Response
@@ -201,7 +203,8 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 		if r := recover(); r != nil {
 			args = append(args, "error", r)
 			args = append(args, "status", "failed")
-			err = fmt.Errorf("panic while executing job: %v", r)
+			stack := string(debug.Stack())
+			err = fmt.Errorf("panic while executing job: %s", stack)
 			return
 		}
 		if resp.Error != nil {
@@ -248,7 +251,6 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 			return
 		}
 	}
-	ctx = context.WithValue(ctx, "log", s.log.With("jobid", job.GetID()))
 	result, next, err = job.Process(ctx, resp)
 	if err != nil {
 		// TODO shall I retry?

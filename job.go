@@ -44,7 +44,7 @@ type IJob interface {
 	Process(ctx context.Context, resp Response) (any, []IJob, error)
 	// GetMaxRetryDelay returns the delay to wait before retrying
 	GetMaxRetryDelay() time.Duration
-	BrowserActions(browser playwright.Browser) Response
+	BrowserActions(ctx context.Context, page playwright.Page) Response
 	// DoScreenshot takes a screenshot of the page
 	// Only works if the scraper uses jsfetcher
 	DoScreenshot() bool
@@ -132,24 +132,8 @@ func (j *Job) DoScreenshot() bool {
 // This is the function that will be executed in the browser
 // this is a default implementation that will just return the response
 // override this function to perform actions in the browser
-func (j *Job) BrowserActions(browser playwright.Browser) Response {
+func (j *Job) BrowserActions(ctx context.Context, page playwright.Page) Response {
 	var resp Response
-	bctx, err := browser.NewContext(playwright.BrowserNewContextOptions{})
-	if err != nil {
-		resp.Error = err
-		return resp
-	}
-	defer bctx.Close()
-	page, err := bctx.NewPage()
-	if err != nil {
-		resp.Error = err
-		return resp
-	}
-	defer page.Close()
-	if err := page.SetViewportSize(1920, 1057); err != nil {
-		resp.Error = err
-		return resp
-	}
 	pageResponse, err := page.Goto(j.GetURL(), playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 	})
