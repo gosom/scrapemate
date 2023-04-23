@@ -29,10 +29,6 @@ type httpFetch struct {
 	netClient HttpClient
 }
 
-func (o *httpFetch) Session(ctx context.Context) (any, error) {
-	return nil, nil
-}
-
 func (o *httpFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
 	jobParams := job.GetUrlParams()
 	params := url.Values{}

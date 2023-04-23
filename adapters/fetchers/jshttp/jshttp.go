@@ -13,11 +13,86 @@ func New(headless bool) (*jsFetch, error) {
 	if err := playwright.Install(); err != nil {
 		return nil, err
 	}
+	ans := jsFetch{
+		headless: headless,
+		pool:     make(chan *browser, 10),
+	}
+	return &ans, nil
+}
+
+type jsFetch struct {
+	headless bool
+	pool     chan *browser
+}
+
+func (o *jsFetch) GetBrowser() (*browser, error) {
+	select {
+	case ans := <-o.pool:
+		return ans, nil
+	default:
+		return newBrowser(o.headless)
+	}
+}
+
+func (o *jsFetch) PutBrowser(b *browser) {
+	select {
+	case o.pool <- b:
+	default:
+		b.Close()
+	}
+}
+
+// Fetch fetches the url specicied by the job and returns the response
+func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
+	browser, err := o.GetBrowser()
+	if err != nil {
+		return scrapemate.Response{
+			Error: err,
+		}
+	}
+	defer o.PutBrowser(browser)
+	if job.GetTimeout() > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, job.GetTimeout())
+		defer cancel()
+	}
+	var page playwright.Page
+
+	if len(browser.ctx.Pages()) > 0 {
+		page = browser.ctx.Pages()[0]
+		for i := 1; i < len(browser.ctx.Pages()); i++ {
+			browser.ctx.Pages()[i].Close()
+		}
+	} else {
+		page, err = browser.ctx.NewPage()
+		if err != nil {
+			return scrapemate.Response{
+				Error: err,
+			}
+		}
+	}
+	defer page.Close()
+	return job.BrowserActions(ctx, page)
+}
+
+type browser struct {
+	pw      *playwright.Playwright
+	browser playwright.Browser
+	ctx     playwright.BrowserContext
+}
+
+func (o *browser) Close() {
+	o.ctx.Close()
+	o.browser.Close()
+	o.pw.Stop()
+}
+
+func newBrowser(headless bool) (*browser, error) {
 	pw, err := playwright.Run()
 	if err != nil {
 		return nil, err
 	}
-	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
+	br, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(headless),
 		Args: []string{
 			`--start-maximized`,
@@ -27,87 +102,19 @@ func New(headless bool) (*jsFetch, error) {
 	if err != nil {
 		return nil, err
 	}
-	ans := jsFetch{
-		pw:      pw,
-		browser: browser,
-	}
-	return &ans, nil
-}
-
-type jsFetch struct {
-	pw      *playwright.Playwright
-	browser playwright.Browser
-}
-
-func (o *jsFetch) Session(ctx context.Context) (any, error) {
-	bctx, err := newBrowserCtx(o.browser)
-	if err != nil {
-		return nil, err
-	}
-	return bctx, nil
-}
-
-// Fetch fetches the url specicied by the job and returns the response
-func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
-	browser, ok := GetBrowserFromContext(ctx)
-	if !ok {
-		var err error
-		browser, err = newBrowserCtx(o.browser)
-		if err != nil {
-			return scrapemate.Response{
-				Error: err,
-			}
-		}
-	}
-	browser.usage++
-	defer func() {
-		pages := browser.bwctx.Pages()
-		if len(pages) >= 2 {
-			for i := 0; i < len(pages)-2; i++ {
-				pages[i].Close()
-			}
-		}
-		for _, page := range browser.bwctx.BackgroundPages() {
-			page.Close()
-		}
-	}()
-	if job.GetTimeout() > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, job.GetTimeout())
-		defer cancel()
-	}
-	return job.BrowserActions(ctx, browser.page)
-}
-
-func GetBrowserFromContext(ctx context.Context) (browserCtx, bool) {
-	bctx, ok := ctx.Value("session").(browserCtx)
-	return bctx, ok
-}
-
-type browserCtx struct {
-	bwctx playwright.BrowserContext
-	page  playwright.Page
-	usage int
-}
-
-func newBrowserCtx(browser playwright.Browser) (browserCtx, error) {
-	bctx, err := browser.NewContext(playwright.BrowserNewContextOptions{
+	bctx, err := br.NewContext(playwright.BrowserNewContextOptions{
 		Viewport: &playwright.BrowserNewContextOptionsViewport{
 			Width:  playwright.Int(1920),
 			Height: playwright.Int(1080),
 		},
 	})
 	if err != nil {
-		return browserCtx{}, err
+		return nil, err
 	}
-	page, err := bctx.NewPage()
-	if err != nil {
-		return browserCtx{}, err
+	ans := browser{
+		pw:      pw,
+		browser: br,
+		ctx:     bctx,
 	}
-	ans := browserCtx{
-		bwctx: bctx,
-		page:  page,
-		usage: 0,
-	}
-	return ans, nil
+	return &ans, nil
 }

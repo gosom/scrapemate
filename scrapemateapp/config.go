@@ -65,6 +65,14 @@ func WithProvider(provider scrapemate.JobProvider) func(*config) error {
 	}
 }
 
+// WithUseSession sets UseSession to true.
+func WithUseSession() func(*config) error {
+	return func(o *config) error {
+		o.UseSession = true
+		return nil
+	}
+}
+
 // Headfull is a helper function to create a headfull browser.
 // Use it as a parameter to WithJS.
 func Headfull() func(*jsOptions) {
@@ -105,6 +113,10 @@ type config struct {
 	// Writers are the writers to use for writing the results.
 	// At least one writer must be provided.
 	Writers []scrapemate.ResultWriter `validate:"required,gt=0"`
+
+	// UseSession is whether to use a session for the scraper
+	// only works with JS enabled for now.
+	UseSession bool `validate:"omitempty"`
 }
 
 func (o *config) validate() error {

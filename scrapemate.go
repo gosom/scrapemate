@@ -347,8 +347,7 @@ func (s *ScrapeMate) waitForSignal(sigChan <-chan os.Signal) {
 }
 
 func (s *ScrapeMate) startWorker(ctx context.Context) {
-	wCtx := s.session(ctx)
-	jobc, errc := s.jobProvider.Jobs(wCtx)
+	jobc, errc := s.jobProvider.Jobs(ctx)
 	for {
 		select {
 		case <-ctx.Done():
@@ -356,33 +355,20 @@ func (s *ScrapeMate) startWorker(ctx context.Context) {
 		case err := <-errc:
 			s.log.Error("error while getting jobs...going to wait a bit", "error", err)
 			time.Sleep(1 * time.Second)
-			jobc, errc = s.jobProvider.Jobs(wCtx)
+			jobc, errc = s.jobProvider.Jobs(ctx)
 			s.log.Info("restarted job provider")
 		case job := <-jobc:
-			ans, next, err := s.DoJob(wCtx, job)
+			ans, next, err := s.DoJob(ctx, job)
 			if err != nil {
 				s.log.Error("error while processing job", "error", err)
 				s.pushToFailedJobs(job)
 				continue
 			}
-			if err := s.finishJob(wCtx, job, ans, next); err != nil {
+			if err := s.finishJob(ctx, job, ans, next); err != nil {
 				s.log.Error("error while finishing job", "error", err)
 				s.pushToFailedJobs(job)
 			}
 		}
-	}
-}
-
-func (s *ScrapeMate) session(ctx context.Context) context.Context {
-	switch s.useSession {
-	case true:
-		session, err := s.httpFetcher.Session(ctx)
-		if err != nil {
-			return ctx
-		}
-		return context.WithValue(ctx, "session", session)
-	default:
-		return ctx
 	}
 }
 
