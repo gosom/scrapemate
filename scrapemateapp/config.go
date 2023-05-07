@@ -8,8 +8,8 @@ import (
 )
 
 // NewConfig creates a new config with default values.
-func NewConfig(writers []scrapemate.ResultWriter, options ...func(*config) error) (*config, error) {
-	cfg := config{
+func NewConfig(writers []scrapemate.ResultWriter, options ...func(*Config) error) (*Config, error) {
+	cfg := Config{
 		Writers: writers,
 	}
 	// defaults
@@ -27,16 +27,16 @@ func NewConfig(writers []scrapemate.ResultWriter, options ...func(*config) error
 }
 
 // WithConcurrency sets the concurrency of the app.
-func WithConcurrency(concurrency int) func(*config) error {
-	return func(o *config) error {
+func WithConcurrency(concurrency int) func(*Config) error {
+	return func(o *Config) error {
 		o.Concurrency = concurrency
 		return o.validate()
 	}
 }
 
 // WithCache sets the cache type and path of the app.
-func WithCache(cacheType, cachePath string) func(*config) error {
-	return func(o *config) error {
+func WithCache(cacheType, cachePath string) func(*Config) error {
+	return func(o *Config) error {
 		o.CacheType = cacheType
 		o.CachePath = cachePath
 		return o.validate()
@@ -44,8 +44,8 @@ func WithCache(cacheType, cachePath string) func(*config) error {
 }
 
 // WithJS sets the app to use JavaScript to render the pages.
-func WithJS(opts ...func(*jsOptions)) func(*config) error {
-	return func(o *config) error {
+func WithJS(opts ...func(*jsOptions)) func(*Config) error {
+	return func(o *Config) error {
 		o.UseJS = true
 		for _, opt := range opts {
 			opt(&o.JSOpts)
@@ -55,8 +55,8 @@ func WithJS(opts ...func(*jsOptions)) func(*config) error {
 }
 
 // WithProvider sets the provider of the app.
-func WithProvider(provider scrapemate.JobProvider) func(*config) error {
-	return func(o *config) error {
+func WithProvider(provider scrapemate.JobProvider) func(*Config) error {
+	return func(o *Config) error {
 		if provider == nil {
 			return errors.New("provider cannot be nil")
 		}
@@ -66,8 +66,8 @@ func WithProvider(provider scrapemate.JobProvider) func(*config) error {
 }
 
 // WithUseSession sets UseSession to true.
-func WithUseSession() func(*config) error {
-	return func(o *config) error {
+func WithUseSession() func(*Config) error {
+	return func(o *Config) error {
 		o.UseSession = true
 		return nil
 	}
@@ -87,7 +87,7 @@ type jsOptions struct {
 	Headfull bool
 }
 
-type config struct {
+type Config struct {
 	// Concurrency is the number of concurrent scrapers to run.
 	// If not set, it defaults to 1.
 	Concurrency int `validate:"required,gte=1"`
@@ -119,7 +119,7 @@ type config struct {
 	UseSession bool `validate:"omitempty"`
 }
 
-func (o *config) validate() error {
+func (o *Config) validate() error {
 	once.Do(func() {
 		validate = validator.New()
 	})

@@ -18,7 +18,7 @@ import (
 )
 
 type ScrapemateApp struct {
-	cfg *config
+	cfg *Config
 
 	ctx    context.Context
 	cancel context.CancelCauseFunc
@@ -28,7 +28,7 @@ type ScrapemateApp struct {
 }
 
 // NewScrapemateApp creates a new ScrapemateApp.
-func NewScrapeMateApp(cfg *config) (*ScrapemateApp, error) {
+func NewScrapeMateApp(cfg *Config) (*ScrapemateApp, error) {
 	app := ScrapemateApp{
 		cfg: cfg,
 	}
