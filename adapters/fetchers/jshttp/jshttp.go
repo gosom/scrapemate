@@ -25,8 +25,10 @@ type jsFetch struct {
 	pool     chan *browser
 }
 
-func (o *jsFetch) GetBrowser() (*browser, error) {
+func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	case ans := <-o.pool:
 		return ans, nil
 	default:
@@ -34,8 +36,10 @@ func (o *jsFetch) GetBrowser() (*browser, error) {
 	}
 }
 
-func (o *jsFetch) PutBrowser(b *browser) {
+func (o *jsFetch) PutBrowser(ctx context.Context, b *browser) {
 	select {
+	case <-ctx.Done():
+		b.Close()
 	case o.pool <- b:
 	default:
 		b.Close()
@@ -44,13 +48,13 @@ func (o *jsFetch) PutBrowser(b *browser) {
 
 // Fetch fetches the url specicied by the job and returns the response
 func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
-	browser, err := o.GetBrowser()
+	browser, err := o.GetBrowser(ctx)
 	if err != nil {
 		return scrapemate.Response{
 			Error: err,
 		}
 	}
-	defer o.PutBrowser(browser)
+	defer o.PutBrowser(ctx, browser)
 	if job.GetTimeout() > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, job.GetTimeout())
