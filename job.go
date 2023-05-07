@@ -30,6 +30,9 @@ type IJob interface {
 	GetHeaders() map[string]string
 	// GetUrlParams returns the url params to use
 	GetUrlParams() map[string]string
+	// GetFullURL returns the full url to request
+	// it includes the url params
+	GetFullURL() string
 	// GetTimeout returns the timeout of the job
 	GetTimeout() time.Duration
 	// GetPriority returns the priority of the job
@@ -103,22 +106,17 @@ func (j *Job) UseInResults() bool {
 
 // GetCacheKey returns the key to use for caching
 func (j *Job) GetCacheKey() string {
-	urlvals := url.Values{}
-	keys := make([]string, 0, len(j.UrlParams))
-	for k := range j.UrlParams {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		urlvals.Add(k, j.UrlParams[k])
-	}
-	u := j.GetURL() + urlvals.Encode()
+	u := j.GetFullURL()
+
 	toHash := fmt.Sprintf("%s:%s", j.GetMethod(), u)
+
 	if j.GetMethod() == http.MethodPost {
 		toHash += string(j.GetBody())
 	}
+
 	hashValue := md5.Sum([]byte(toHash))
 	cacheKey := hex.EncodeToString(hashValue[:])
+
 	return cacheKey
 }
 
@@ -134,7 +132,7 @@ func (j *Job) DoScreenshot() bool {
 // override this function to perform actions in the browser
 func (j *Job) BrowserActions(ctx context.Context, page playwright.Page) Response {
 	var resp Response
-	pageResponse, err := page.Goto(j.GetURL(), playwright.PageGotoOptions{
+	pageResponse, err := page.Goto(j.GetFullURL(), playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 	})
 	if err != nil {
@@ -214,6 +212,30 @@ func (j *Job) GetBody() []byte {
 // GetURL returns the url to request
 func (j *Job) GetURL() string {
 	return j.URL
+}
+
+func (j *Job) GetFullURL() string {
+	urlvals := url.Values{}
+	keys := make([]string, 0, len(j.UrlParams))
+
+	for k := range j.UrlParams {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		urlvals.Add(k, j.UrlParams[k])
+	}
+
+	var u string
+	if len(urlvals) > 0 {
+		u = fmt.Sprintf("%s?%s", j.URL, urlvals.Encode())
+	} else {
+		u = j.URL
+	}
+
+	return u
 }
 
 // GetHeaders returns the headers to use

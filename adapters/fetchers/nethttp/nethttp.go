@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"sync"
 
 	"github.com/gosom/scrapemate"
@@ -30,32 +29,33 @@ type httpFetch struct {
 }
 
 func (o *httpFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
-	jobParams := job.GetUrlParams()
-	params := url.Values{}
-	for k, v := range jobParams {
-		params.Add(k, v)
-	}
-	u := job.GetURL() + "?" + params.Encode()
-
+	u := job.GetFullURL()
 	reqBody := getBuffer()
+
 	defer putBuffer(reqBody)
+
 	if len(job.GetBody()) > 0 {
 		reqBody.Write(job.GetBody())
 	}
+
 	var ans scrapemate.Response
+
 	req, err := http.NewRequestWithContext(ctx, job.GetMethod(), u, reqBody)
 	if err != nil {
 		ans.Error = err
 		return ans
 	}
+
 	for k, v := range job.GetHeaders() {
 		req.Header.Add(k, v)
 	}
+
 	resp, err := o.netClient.Do(req)
 	if err != nil {
 		ans.Error = err
 		return ans
 	}
+
 	defer func() {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
