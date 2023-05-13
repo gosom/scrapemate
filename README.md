@@ -83,7 +83,7 @@ type SimpleCountryJob struct {
 	scrapemate.Job
 }
 
-func (j *SimpleCountryJob) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
+func (j *SimpleCountryJob) Process(ctx context.Context, resp *scrapemate.Response) (any, []scrapemate.IJob, error) {
 	doc, ok := resp.Document.(*goquery.Document)
 	if !ok {
 		return nil, nil, fmt.Errorf("failed to cast response document to goquery document")
