@@ -30,6 +30,9 @@ jobs:
           go-version: ${{ matrix.go }}
           check-latest: true
 
+      - name: Lint
+        run: make lint
+
       - name: Go Format
         run: make format && git diff --exit-code
 

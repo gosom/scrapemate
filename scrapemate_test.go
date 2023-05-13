@@ -17,17 +17,19 @@ import (
 
 type mockedServices struct {
 	provider *mock.MockJobProvider
-	fetcher  *mock.MockHttpFetcher
-	parser   *mock.MockHtmlParser
+	fetcher  *mock.MockHTTPFetcher
+	parser   *mock.MockHTMLParser
 	cache    *mock.MockCacher
 }
 
 func getMockedServices(t *testing.T) *mockedServices {
+	t.Helper()
 	mockCtrl := gomock.NewController(t)
-	httpFetcher := mock.NewMockHttpFetcher(mockCtrl)
+	httpFetcher := mock.NewMockHTTPFetcher(mockCtrl)
 	provider := mock.NewMockJobProvider(mockCtrl)
-	parser := mock.NewMockHtmlParser(mockCtrl)
+	parser := mock.NewMockHTMLParser(mockCtrl)
 	cache := mock.NewMockCacher(mockCtrl)
+
 	return &mockedServices{
 		provider: provider,
 		fetcher:  httpFetcher,
@@ -51,7 +53,7 @@ func Test_New(t *testing.T) {
 	t.Run("works with default options", func(t *testing.T) {
 		s, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, s)
@@ -66,7 +68,7 @@ func Test_New_With_Options(t *testing.T) {
 	t.Run("with failed", func(t *testing.T) {
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithFailed(),
 		)
 		require.NoError(t, err)
@@ -78,7 +80,7 @@ func Test_New_With_Options(t *testing.T) {
 		defer cancel(errors.New("test"))
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithContext(ctx, cancel),
 		)
 		require.NoError(t, err)
@@ -86,7 +88,7 @@ func Test_New_With_Options(t *testing.T) {
 		t.Run("with nil cancel", func(t *testing.T) {
 			_, err := scrapemate.New(
 				scrapemate.WithJobProvider(svc.provider),
-				scrapemate.WithHttpFetcher(svc.fetcher),
+				scrapemate.WithHTTPFetcher(svc.fetcher),
 				scrapemate.WithContext(context.Background(), nil),
 			)
 			require.NoError(t, err)
@@ -94,7 +96,8 @@ func Test_New_With_Options(t *testing.T) {
 		t.Run("with nil context", func(t *testing.T) {
 			_, err := scrapemate.New(
 				scrapemate.WithJobProvider(svc.provider),
-				scrapemate.WithHttpFetcher(svc.fetcher),
+				scrapemate.WithHTTPFetcher(svc.fetcher),
+				//nolint:staticcheck // ignore error
 				scrapemate.WithContext(nil, nil),
 			)
 			require.Error(t, err)
@@ -103,7 +106,7 @@ func Test_New_With_Options(t *testing.T) {
 	t.Run("with concurrency", func(t *testing.T) {
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithConcurrency(10),
 		)
 		require.NoError(t, err)
@@ -112,7 +115,7 @@ func Test_New_With_Options(t *testing.T) {
 		t.Run("with concurrency less than 1", func(t *testing.T) {
 			_, err := scrapemate.New(
 				scrapemate.WithJobProvider(svc.provider),
-				scrapemate.WithHttpFetcher(svc.fetcher),
+				scrapemate.WithHTTPFetcher(svc.fetcher),
 				scrapemate.WithConcurrency(0),
 			)
 			require.Error(t, err)
@@ -121,7 +124,7 @@ func Test_New_With_Options(t *testing.T) {
 	t.Run("with logger", func(t *testing.T) {
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithLogger(logging.Get()),
 		)
 		require.NoError(t, err)
@@ -129,7 +132,7 @@ func Test_New_With_Options(t *testing.T) {
 		t.Run("with nil logger", func(t *testing.T) {
 			_, err := scrapemate.New(
 				scrapemate.WithJobProvider(svc.provider),
-				scrapemate.WithHttpFetcher(svc.fetcher),
+				scrapemate.WithHTTPFetcher(svc.fetcher),
 				scrapemate.WithLogger(nil),
 			)
 			require.Error(t, err)
@@ -137,14 +140,14 @@ func Test_New_With_Options(t *testing.T) {
 	})
 	t.Run("with nil job provider", func(t *testing.T) {
 		_, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(nil),
 		)
 		require.Error(t, err)
 	})
 	t.Run("with nil http fetcher", func(t *testing.T) {
 		_, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(nil),
+			scrapemate.WithHTTPFetcher(nil),
 			scrapemate.WithJobProvider(svc.provider),
 		)
 		require.Error(t, err)
@@ -152,16 +155,16 @@ func Test_New_With_Options(t *testing.T) {
 	t.Run("with html parser", func(t *testing.T) {
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
-			scrapemate.WithHtmlParser(svc.parser),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
+			scrapemate.WithHTMLParser(svc.parser),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
 		t.Run("with nil parser", func(t *testing.T) {
 			_, err := scrapemate.New(
 				scrapemate.WithJobProvider(svc.provider),
-				scrapemate.WithHttpFetcher(svc.fetcher),
-				scrapemate.WithHtmlParser(nil),
+				scrapemate.WithHTTPFetcher(svc.fetcher),
+				scrapemate.WithHTMLParser(nil),
 			)
 			require.Error(t, err)
 		})
@@ -169,7 +172,7 @@ func Test_New_With_Options(t *testing.T) {
 	t.Run("with cache", func(t *testing.T) {
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithCache(svc.cache),
 		)
 		require.NoError(t, err)
@@ -177,7 +180,7 @@ func Test_New_With_Options(t *testing.T) {
 		t.Run("with nil cache", func(t *testing.T) {
 			_, err := scrapemate.New(
 				scrapemate.WithJobProvider(svc.provider),
-				scrapemate.WithHttpFetcher(svc.fetcher),
+				scrapemate.WithHTTPFetcher(svc.fetcher),
 				scrapemate.WithCache(nil),
 			)
 			require.Error(t, err)
@@ -190,7 +193,7 @@ func Test_Done_Err(t *testing.T) {
 	svc := getMockedServices(t)
 	mate, err := scrapemate.New(
 		scrapemate.WithJobProvider(svc.provider),
-		scrapemate.WithHttpFetcher(svc.fetcher),
+		scrapemate.WithHTTPFetcher(svc.fetcher),
 		scrapemate.WithContext(ctx, cancelFn),
 	)
 	require.NoError(t, err)
@@ -201,6 +204,7 @@ func Test_Done_Err(t *testing.T) {
 	default:
 		require.Fail(t, "should be done")
 	}
+
 	err = mate.Err()
 	require.Error(t, err)
 	require.Equal(t, "test", err.Error())
@@ -212,7 +216,7 @@ func Test_Start(t *testing.T) {
 		ctx, cancelFn := context.WithCancelCause(context.Background())
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithContext(ctx, cancelFn),
 		)
 		require.NoError(t, err)
@@ -244,7 +248,7 @@ func Test_Start(t *testing.T) {
 	t.Run("exits when an interrupt signal is received", func(t *testing.T) {
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
@@ -261,10 +265,11 @@ func Test_Start(t *testing.T) {
 			return errc
 		}
 		select {
-		case err := <-mateErr():
+		case err = <-mateErr():
 			require.NoError(t, err)
 		case <-time.After(1 * time.Second):
-			syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+			err = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+			require.NoError(t, err)
 		}
 		require.NoError(t, mate.Err())
 	})
@@ -272,7 +277,7 @@ func Test_Start(t *testing.T) {
 		ctx, cancelFn := context.WithCancelCause(context.Background())
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithContext(ctx, cancelFn),
 		)
 		require.NoError(t, err)
@@ -297,10 +302,9 @@ func Test_Start(t *testing.T) {
 			return errc
 		}()
 
-		select {
-		case <-time.After(1100 * time.Millisecond):
-			cancelFn(scrapemate.ErrorExitSignal)
-		}
+		time.Sleep(1100 * time.Millisecond)
+		cancelFn(scrapemate.ErrorExitSignal)
+
 		select {
 		case err := <-mateErr:
 			require.Error(t, err)
@@ -334,7 +338,7 @@ func Test_Start(t *testing.T) {
 		})
 		mate, err := scrapemate.New(
 			scrapemate.WithContext(ctx, cancel),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 			scrapemate.WithFailed(),
 		)
@@ -394,7 +398,7 @@ func Test_Start(t *testing.T) {
 		})
 		mate, err := scrapemate.New(
 			scrapemate.WithContext(ctx, cancel),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 			scrapemate.WithFailed(),
 		)
@@ -466,7 +470,7 @@ func Test_Start(t *testing.T) {
 		svc.provider.EXPECT().Push(gomock.Any(), gomock.Any()).Return(errors.New("error pushing"))
 		mate, err := scrapemate.New(
 			scrapemate.WithContext(ctx, cancel),
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 			scrapemate.WithFailed(),
 		)
@@ -501,7 +505,7 @@ type testJobWithError struct {
 	scrapemate.Job
 }
 
-func (j *testJobWithError) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
+func (j *testJobWithError) Process(_ context.Context, _ *scrapemate.Response) (any, []scrapemate.IJob, error) {
 	return nil, nil, errors.New("error processing")
 }
 
@@ -509,12 +513,13 @@ type testJobWithNext struct {
 	scrapemate.Job
 }
 
-func (j *testJobWithNext) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
+func (j *testJobWithNext) Process(_ context.Context, _ *scrapemate.Response) (any, []scrapemate.IJob, error) {
 	next := &testJob{
 		Job: scrapemate.Job{
 			URL: "http://example.com/next",
 		},
 	}
+
 	return nil, []scrapemate.IJob{next}, nil
 }
 
@@ -522,7 +527,7 @@ type testJob struct {
 	scrapemate.Job
 }
 
-func (j *testJob) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
+func (j *testJob) Process(_ context.Context, _ *scrapemate.Response) (any, []scrapemate.IJob, error) {
 	return nil, nil, nil
 }
 
@@ -532,9 +537,10 @@ func Test_DoJob(t *testing.T) {
 	job := scrapemate.Job{
 		URL: "http://example.com",
 	}
+
 	t.Run("when panic", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 		)
 		require.NoError(t, err)
@@ -547,7 +553,7 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("invalidStatusCode+policy:Retry+maxRetries:0", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 		)
 		require.NoError(t, err)
@@ -561,7 +567,7 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("invalidStatusCode+policy:Retry+maxRetries:1", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 		)
 		require.NoError(t, err)
@@ -577,7 +583,7 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("invalidStatusCode+policy:Retry+maxRetries:10-testMax5", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 		)
 		require.NoError(t, err)
@@ -594,14 +600,14 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("customDoCheckResponse", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
 		job2 := scrapemate.Job{
 			URL: "http://example.com",
-			CheckResponse: func(response scrapemate.Response) bool {
+			CheckResponse: func(response *scrapemate.Response) bool {
 				return response.StatusCode == 301
 			},
 		}
@@ -614,7 +620,7 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("invalidStatusCode+policy:StopScraping+maxRetries:0", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 		)
 		require.NoError(t, err)
@@ -641,7 +647,7 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("invalidStatusCode+policy:DiscardJob+maxRetries:0", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
 		)
 		require.NoError(t, err)
@@ -666,9 +672,9 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("successResponse+parseError", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHtmlParser(svc.parser),
+			scrapemate.WithHTMLParser(svc.parser),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
@@ -682,9 +688,9 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("success+cache+parseError", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHtmlParser(svc.parser),
+			scrapemate.WithHTMLParser(svc.parser),
 			scrapemate.WithCache(svc.cache),
 		)
 		require.NoError(t, err)
@@ -699,9 +705,9 @@ func Test_DoJob(t *testing.T) {
 	})
 	t.Run("success+cacheError+parseError", func(t *testing.T) {
 		mate, err := scrapemate.New(
-			scrapemate.WithHttpFetcher(svc.fetcher),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
 			scrapemate.WithJobProvider(svc.provider),
-			scrapemate.WithHtmlParser(svc.parser),
+			scrapemate.WithHTMLParser(svc.parser),
 			scrapemate.WithCache(svc.cache),
 		)
 		require.NoError(t, err)

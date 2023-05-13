@@ -2,7 +2,7 @@ package scrapemate
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // we don't need a cryptographically secure hash here
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -28,8 +28,8 @@ type IJob interface {
 	GetURL() string
 	// GetHeaders returns the headers to use
 	GetHeaders() map[string]string
-	// GetUrlParams returns the url params to use
-	GetUrlParams() map[string]string
+	// GetURLParams returns the url params to use
+	GetURLParams() map[string]string
 	// GetFullURL returns the full url to request
 	// it includes the url params
 	GetFullURL() string
@@ -38,13 +38,13 @@ type IJob interface {
 	// GetPriority returns the priority of the job
 	GetPriority() int
 	// CheckResponse checks the response of the job
-	DoCheckResponse(resp Response) bool
+	DoCheckResponse(resp *Response) bool
 	// GetActionOnResponse returns the action to perform on the response
 	GetRetryPolicy() RetryPolicy
 	// GetMaxRetries returns the max retries of the job
 	GetMaxRetries() int
 	// Process processes the job
-	Process(ctx context.Context, resp Response) (any, []IJob, error)
+	Process(ctx context.Context, resp *Response) (any, []IJob, error)
 	// GetMaxRetryDelay returns the delay to wait before retrying
 	GetMaxRetryDelay() time.Duration
 	BrowserActions(ctx context.Context, page playwright.Page) Response
@@ -69,8 +69,8 @@ type Job struct {
 	URL string
 	// Headers is the map of headers to use in HTTP
 	Headers map[string]string
-	// UrlParams are the url parameters to use in the query string
-	UrlParams map[string]string
+	// URLParams are the url parameters to use in the query string
+	URLParams map[string]string
 	// Timeout is the timeout of that job. By timeout we mean the time
 	// it takes to finish a single crawl
 	Timeout time.Duration
@@ -83,9 +83,9 @@ type Job struct {
 	// true: when the response is to be accepted
 	// false: when the response is to be rejected
 	// By default a response is accepted if status code is 200
-	CheckResponse func(resp Response) bool
+	CheckResponse func(resp *Response) bool
 	// RetryPolicy can be one of:
-	// RetryJob: to retry the job untl it's sucessful
+	// RetryJob: to retry the job untl it's successful
 	// DiscardJob:for not accepted responses just discard them and do not retry the job
 	// RefreshIP: Similar to RetryJob with an importan difference
 	// 				Before the job is retried the IP is refreshed.
@@ -94,7 +94,7 @@ type Job struct {
 	// for a MaxRetries numbers of time. If the sleep time between the retries is more than
 	// MaxRetryDelay then it's capped to that. (Default is 2 seconds)
 	MaxRetryDelay time.Duration
-	//TakeScreenshot if true takes a screenshot of the page
+	// TakeScreenshot if true takes a screenshot of the page
 	TakeScreenshot bool
 	Response       Response
 }
@@ -114,7 +114,7 @@ func (j *Job) GetCacheKey() string {
 		toHash += string(j.GetBody())
 	}
 
-	hashValue := md5.Sum([]byte(toHash))
+	hashValue := md5.Sum([]byte(toHash)) //nolint:gosec // we don't need a cryptographically secure hash here
 	cacheKey := hex.EncodeToString(hashValue[:])
 
 	return cacheKey
@@ -130,8 +130,9 @@ func (j *Job) DoScreenshot() bool {
 // This is the function that will be executed in the browser
 // this is a default implementation that will just return the response
 // override this function to perform actions in the browser
-func (j *Job) BrowserActions(ctx context.Context, page playwright.Page) Response {
+func (j *Job) BrowserActions(_ context.Context, page playwright.Page) Response {
 	var resp Response
+
 	pageResponse, err := page.Goto(j.GetFullURL(), playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 	})
@@ -139,18 +140,24 @@ func (j *Job) BrowserActions(ctx context.Context, page playwright.Page) Response
 		resp.Error = err
 		return resp
 	}
+
 	resp.URL = pageResponse.URL()
 	resp.StatusCode = pageResponse.Status()
 	resp.Headers = make(http.Header, len(pageResponse.Headers()))
+
 	for k, v := range pageResponse.Headers() {
 		resp.Headers.Add(k, v)
 	}
+
 	body, err := pageResponse.Body()
 	if err != nil {
 		resp.Error = err
+
 		return resp
 	}
-	resp.Body = []byte(body)
+
+	resp.Body = body
+
 	if j.DoScreenshot() {
 		screenshot, err := page.Screenshot(playwright.PageScreenshotOptions{
 			FullPage: playwright.Bool(true),
@@ -159,28 +166,31 @@ func (j *Job) BrowserActions(ctx context.Context, page playwright.Page) Response
 			resp.Error = err
 			return resp
 		}
+
 		resp.Screenshot = screenshot
 	}
+
 	return resp
 }
 
 // String returns the string representation of the job
 func (j *Job) String() string {
-	return fmt.Sprintf("Job{ID: %s, Method: %s, URL: %s, UrlParams: %v}", j.ID, j.Method, j.URL, j.UrlParams)
+	return fmt.Sprintf("Job{ID: %s, Method: %s, URL: %s, UrlParams: %v}", j.ID, j.Method, j.URL, j.URLParams)
 }
 
 // Process processes the job
-func (j *Job) Process(ctx context.Context, resp Response) (any, []IJob, error) {
+func (j *Job) Process(_ context.Context, _ *Response) (any, []IJob, error) {
 	return nil, nil, nil
 }
 
 // CheckResponse checks the response of the job
-func (j *Job) DoCheckResponse(resp Response) bool {
+func (j *Job) DoCheckResponse(resp *Response) bool {
 	if j.CheckResponse == nil {
-		return func(resp Response) bool {
+		return func(resp *Response) bool {
 			return resp.StatusCode >= 200 && resp.StatusCode < 300
 		}(resp)
 	}
+
 	return j.CheckResponse(resp)
 }
 
@@ -216,16 +226,16 @@ func (j *Job) GetURL() string {
 
 func (j *Job) GetFullURL() string {
 	urlvals := url.Values{}
-	keys := make([]string, 0, len(j.UrlParams))
+	keys := make([]string, 0, len(j.URLParams))
 
-	for k := range j.UrlParams {
+	for k := range j.URLParams {
 		keys = append(keys, k)
 	}
 
 	sort.Strings(keys)
 
 	for _, k := range keys {
-		urlvals.Add(k, j.UrlParams[k])
+		urlvals.Add(k, j.URLParams[k])
 	}
 
 	var u string
@@ -243,9 +253,9 @@ func (j *Job) GetHeaders() map[string]string {
 	return j.Headers
 }
 
-// GetUrlParams returns the url params to use
-func (j *Job) GetUrlParams() map[string]string {
-	return j.UrlParams
+// GetURLParams returns the url params to use
+func (j *Job) GetURLParams() map[string]string {
+	return j.URLParams
 }
 
 // GetTimeout returns the timeout of the job
@@ -263,5 +273,6 @@ func (j *Job) GetMaxRetryDelay() time.Duration {
 	if j.MaxRetryDelay == 0 {
 		return DefaultMaxRetryDelay
 	}
+
 	return j.MaxRetryDelay
 }

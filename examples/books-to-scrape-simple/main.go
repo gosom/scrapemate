@@ -67,7 +67,7 @@ func run() error {
 		provider.Push(ctx, job)
 	}()
 
-	var httpFetcher scrapemate.HttpFetcher
+	var httpFetcher scrapemate.HTTPFetcher
 	var err error
 	switch useJS {
 	case true:
@@ -84,9 +84,9 @@ func run() error {
 	mate, err := scrapemate.New(
 		scrapemate.WithContext(ctx, cancel),
 		scrapemate.WithJobProvider(provider),
-		scrapemate.WithHttpFetcher(httpFetcher),
+		scrapemate.WithHTTPFetcher(httpFetcher),
 		scrapemate.WithConcurrency(concurrency),
-		scrapemate.WithHtmlParser(parser.New()),
+		scrapemate.WithHTMLParser(parser.New()),
 	)
 
 	if err != nil {

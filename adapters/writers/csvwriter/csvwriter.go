@@ -18,37 +18,45 @@ type csvWriter struct {
 }
 
 // NewCsvWriter creates a new csv writer
-func NewCsvWriter(w *csv.Writer) *csvWriter {
+func NewCsvWriter(w *csv.Writer) scrapemate.ResultWriter {
 	return &csvWriter{w: w}
 }
 
 // Run runs the writer.
-func (c *csvWriter) Run(ctx context.Context, in <-chan scrapemate.Result) error {
+func (c *csvWriter) Run(_ context.Context, in <-chan scrapemate.Result) error {
 	for result := range in {
 		elements, err := c.getCsvCapable(result.Data)
 		if err != nil {
 			return err
 		}
+
 		if len(elements) == 0 {
 			continue
 		}
+
 		c.once.Do(func() {
-			c.w.Write(elements[0].CsvHeaders())
+			// I don't like this, but I don't know how to do it better
+			_ = c.w.Write(elements[0].CsvHeaders())
 		})
+
 		for _, element := range elements {
 			if err := c.w.Write(element.CsvRow()); err != nil {
 				return err
 			}
 		}
+
 		c.w.Flush()
 	}
+
 	return c.w.Error()
 }
 
 func (c *csvWriter) getCsvCapable(data any) ([]scrapemate.CsvCapable, error) {
 	var elements []scrapemate.CsvCapable
+
 	if interfaceIsSlice(data) {
 		s := reflect.ValueOf(data)
+
 		for i := 0; i < s.Len(); i++ {
 			val := s.Index(i).Interface()
 			if element, ok := val.(scrapemate.CsvCapable); ok {
@@ -62,10 +70,12 @@ func (c *csvWriter) getCsvCapable(data any) ([]scrapemate.CsvCapable, error) {
 	} else {
 		return nil, fmt.Errorf("%w: unexpected data type: %T", scrapemate.ErrorNotCsvCapable, data)
 	}
+
 	return elements, nil
 }
 
 func interfaceIsSlice(t any) bool {
+	//nolint:exhaustive // we only need to check for slices
 	switch reflect.TypeOf(t).Kind() {
 	case reflect.Slice:
 		return true

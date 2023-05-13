@@ -13,10 +13,10 @@ var (
 	ErrorNoContext = errors.New("no context set")
 	// ErrorConcurrency returned when you try to initialize it with concurrency <1
 	ErrorConcurrency = errors.New("concurrency must be greater than 0")
-	// ErrorNoHttpFetcher returned when you try to initialize with a nil httpFetcher
-	ErrorNoHttpFetcher = errors.New("no http fetcher set")
-	// ErrorNoHtmlParser returned when you try to initialized with a nil HtmlParser
-	ErrorNoHtmlParser = errors.New("no html parser set")
+	// ErrorNoHTMLFetcher returned when you try to initialize with a nil httpFetcher
+	ErrorNoHTMLFetcher = errors.New("no http fetcher set")
+	// ErrorNoHTMLParser returned when you try to initialized with a nil HtmlParser
+	ErrorNoHTMLParser = errors.New("no html parser set")
 	// ErrorNoCacher returned when you try to initialized with a nil Cacher
 	ErrorNoCacher = errors.New("no cacher set")
 	// ErrorNoCsvCapable returned when you try to write a csv file without a csv capable Data

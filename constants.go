@@ -19,4 +19,11 @@ const (
 
 	// DefaultMaxRetryDelay the default max delay between 2 consequive retries
 	DefaultMaxRetryDelay = 2 * time.Second
+
+	// PriorityHigh high priority
+	PriorityHigh = 0
+	// PriorityMedium medium priority
+	PriorityMedium = 1
+	// PriorityLow low priority
+	PriorityLow = 2
 )

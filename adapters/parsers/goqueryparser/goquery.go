@@ -7,17 +7,18 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-type GoQueryHtmlParser struct {
+type GoQueryHTMLParser struct {
 }
 
-func New() *GoQueryHtmlParser {
-	return &GoQueryHtmlParser{}
+func New() *GoQueryHTMLParser {
+	return &GoQueryHTMLParser{}
 }
 
-func (g *GoQueryHtmlParser) Parse(ctx context.Context, body []byte) (any, error) {
+func (g *GoQueryHTMLParser) Parse(_ context.Context, body []byte) (any, error) {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
+
 	return doc, nil
 }

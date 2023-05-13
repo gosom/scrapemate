@@ -15,17 +15,17 @@ type JobProvider interface {
 	Push(ctx context.Context, job IJob) error
 }
 
-// HttpFetcher is an interface for http fetchers
+// HTTPFetcher is an interface for http fetchers
 //
-//go:generate mockgen -destination=mock/mock_http_fetcher.go -package=mock . HttpFetcher
-type HttpFetcher interface {
+//go:generate mockgen -destination=mock/mock_http_fetcher.go -package=mock . HTTPFetcher
+type HTTPFetcher interface {
 	Fetch(ctx context.Context, job IJob) Response
 }
 
-// HtmlParser is an interface for html parsers
+// HTMLParser is an interface for html parsers
 //
-//go:generate mockgen -destination=mock/mock_parser.go -package=mock . HtmlParser
-type HtmlParser interface {
+//go:generate mockgen -destination=mock/mock_parser.go -package=mock . HTMLParser
+type HTMLParser interface {
 	Parse(ctx context.Context, body []byte) (any, error)
 }
 
@@ -35,7 +35,7 @@ type HtmlParser interface {
 type Cacher interface {
 	Close() error
 	Get(ctx context.Context, key string) (Response, error)
-	Set(ctx context.Context, key string, value Response) error
+	Set(ctx context.Context, key string, value *Response) error
 }
 
 // ResultWriter is an interface for result writers

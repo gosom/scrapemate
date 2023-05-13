@@ -9,7 +9,7 @@ import (
 var _ scrapemate.JobProvider = (*memoryProvider)(nil)
 
 // New creates a new memory provider
-func New() *memoryProvider {
+func New() scrapemate.JobProvider {
 	return &memoryProvider{
 		p0: make(chan scrapemate.IJob),
 		p1: make(chan scrapemate.IJob),
@@ -24,12 +24,16 @@ type memoryProvider struct {
 }
 
 // Jobs returns the channel to get jobs from
+//
+//nolint:gocritic // we need to return a read only channel
 func (o *memoryProvider) Jobs(ctx context.Context) (<-chan scrapemate.IJob, <-chan error) {
 	out := make(chan scrapemate.IJob)
 	errc := make(chan error, 1)
+
 	go func() {
 		for {
 			var job scrapemate.IJob
+
 			select {
 			case <-ctx.Done():
 				errc <- ctx.Err()
@@ -60,6 +64,7 @@ func (o *memoryProvider) Jobs(ctx context.Context) (<-chan scrapemate.IJob, <-ch
 			}
 		}
 	}()
+
 	return out, errc
 }
 
@@ -69,16 +74,18 @@ func (o *memoryProvider) Push(ctx context.Context, job scrapemate.IJob) error {
 	// not sure if this is a good idea
 	go func() {
 		var ch chan scrapemate.IJob
+
 		switch job.GetPriority() {
-		case 0:
+		case scrapemate.PriorityHigh:
 			ch = o.p0
-		case 1:
+		case scrapemate.PriorityMedium:
 			ch = o.p1
-		case 2:
+		case scrapemate.PriorityLow:
 			ch = o.p2
 		default:
 			ch = o.p0
 		}
+
 		select {
 		case ch <- job:
 			return
@@ -86,5 +93,6 @@ func (o *memoryProvider) Push(ctx context.Context, job scrapemate.IJob) error {
 			return
 		}
 	}()
+
 	return nil
 }

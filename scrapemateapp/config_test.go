@@ -12,6 +12,7 @@ import (
 
 func Test_NewConfig(t *testing.T) {
 	resultwriter := &mock.MockResultWriter{}
+
 	t.Run("default", func(t *testing.T) {
 		cfg, err := scrapemateapp.NewConfig([]scrapemate.ResultWriter{resultwriter})
 		require.NoError(t, err)

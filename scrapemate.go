@@ -17,6 +17,7 @@ import (
 // New creates a new scrapemate
 func New(options ...func(*ScrapeMate) error) (*ScrapeMate, error) {
 	s := &ScrapeMate{}
+
 	for _, opt := range options {
 		if err := opt(s); err != nil {
 			return nil, err
@@ -26,8 +27,9 @@ func New(options ...func(*ScrapeMate) error) (*ScrapeMate, error) {
 	if s.jobProvider == nil {
 		return nil, ErrorNoJobProvider
 	}
+
 	if s.httpFetcher == nil {
-		return nil, ErrorNoHttpFetcher
+		return nil, ErrorNoHTMLFetcher
 	}
 	// here we can set default options
 	s.results = make(chan Result)
@@ -35,16 +37,20 @@ func New(options ...func(*ScrapeMate) error) (*ScrapeMate, error) {
 	if s.ctx == nil {
 		s.ctx, s.cancelFn = context.WithCancelCause(context.Background())
 	}
+
 	if s.cancelFn == nil {
 		s.ctx, s.cancelFn = context.WithCancelCause(s.ctx)
 	}
+
 	if s.log == nil {
 		s.log = logging.Get().With("component", "scrapemate")
 		s.log.Debug("using default logger")
 	}
+
 	if s.concurrency == 0 {
 		s.concurrency = 1
 	}
+
 	return s, nil
 }
 
@@ -62,8 +68,10 @@ func WithContext(ctx context.Context, cancelFn context.CancelCauseFunc) func(*Sc
 		if ctx == nil {
 			return ErrorNoContext
 		}
+
 		s.ctx = ctx
 		s.cancelFn = cancelFn
+
 		return nil
 	}
 }
@@ -74,7 +82,9 @@ func WithLogger(log logging.Logger) func(*ScrapeMate) error {
 		if log == nil {
 			return ErrorNoLogger
 		}
+
 		s.log = log
+
 		return nil
 	}
 }
@@ -85,7 +95,9 @@ func WithJobProvider(provider JobProvider) func(*ScrapeMate) error {
 		if provider == nil {
 			return errors.New("job provider is nil")
 		}
+
 		s.jobProvider = provider
+
 		return nil
 	}
 }
@@ -96,29 +108,35 @@ func WithConcurrency(concurrency int) func(*ScrapeMate) error {
 		if concurrency < 1 {
 			return ErrorConcurrency
 		}
+
 		s.concurrency = concurrency
+
 		return nil
 	}
 }
 
-// WithHttpFetcher sets the http fetcher for the scrapemate
-func WithHttpFetcher(client HttpFetcher) func(*ScrapeMate) error {
+// WithHTTPFetcher sets the http fetcher for the scrapemate
+func WithHTTPFetcher(client HTTPFetcher) func(*ScrapeMate) error {
 	return func(s *ScrapeMate) error {
 		if client == nil {
-			return ErrorNoHttpFetcher
+			return ErrorNoHTMLFetcher
 		}
+
 		s.httpFetcher = client
+
 		return nil
 	}
 }
 
-// WithHtmlParser sets the html parser for the scrapemate
-func WithHtmlParser(parser HtmlParser) func(*ScrapeMate) error {
+// WithHTMLParser sets the html parser for the scrapemate
+func WithHTMLParser(parser HTMLParser) func(*ScrapeMate) error {
 	return func(s *ScrapeMate) error {
 		if parser == nil {
-			return ErrorNoHtmlParser
+			return ErrorNoHTMLParser
 		}
+
 		s.htmlParser = parser
+
 		return nil
 	}
 }
@@ -129,7 +147,9 @@ func WithCache(cache Cacher) func(*ScrapeMate) error {
 		if cache == nil {
 			return ErrorNoCacher
 		}
+
 		s.cache = cache
+
 		return nil
 	}
 }
@@ -140,6 +160,7 @@ func WithCache(cache Cacher) func(*ScrapeMate) error {
 func WithSession() func(*ScrapeMate) error {
 	return func(s *ScrapeMate) error {
 		s.useSession = true
+
 		return nil
 	}
 }
@@ -151,8 +172,8 @@ type ScrapeMate struct {
 	cancelFn    context.CancelCauseFunc
 	jobProvider JobProvider
 	concurrency int
-	httpFetcher HttpFetcher
-	htmlParser  HtmlParser
+	httpFetcher HTTPFetcher
+	htmlParser  HTMLParser
 	cache       Cacher
 	results     chan Result
 	failedJobs  chan IJob
@@ -162,26 +183,37 @@ type ScrapeMate struct {
 // Start starts the scraper
 func (s *ScrapeMate) Start() error {
 	s.log.Info("starting scrapemate")
+
 	defer func() {
 		close(s.results)
+
 		if s.failedJobs != nil {
 			close(s.failedJobs)
 		}
+
 		s.log.Info("scrapemate exited")
 	}()
+
 	exitChan := make(chan os.Signal, 1)
+
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)
 	s.waitForSignal(exitChan)
+
 	wg := sync.WaitGroup{}
 	wg.Add(s.concurrency)
+
 	for i := 0; i < s.concurrency; i++ {
 		go func() {
 			defer wg.Done()
+
 			s.startWorker(s.ctx)
 		}()
 	}
+
 	wg.Wait()
+
 	<-s.Done()
+
 	return s.Err()
 }
 
@@ -203,37 +235,48 @@ func (s *ScrapeMate) Failed() <-chan IJob {
 
 // DoJob scrapes a job and returns it's result
 func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJob, err error) {
-	ctx = context.WithValue(ctx, "log", s.log.With("jobid", job.GetID()))
+	ctx = context.WithValue(ctx, contextKey("log"), s.log.With("jobid", job.GetID()))
 	startTime := time.Now().UTC()
+
 	s.log.Debug("starting job", "job", job)
+
 	var resp Response
+
 	defer func() {
 		args := []any{
 			"job", job,
 		}
+
 		if r := recover(); r != nil {
-			args = append(args, "error", r)
-			args = append(args, "status", "failed")
+			args = append(args, "error", r, "status", "failed")
 			stack := string(debug.Stack())
 			err = fmt.Errorf("panic while executing job: %s", stack)
+			args = append(args, "error", err)
+			s.log.Error("job finished", args...)
+
 			return
 		}
+
 		if resp.Error != nil {
-			args = append(args, "error", resp.Error)
-			args = append(args, "status", "failed")
+			args = append(args, "error", resp.Error, "status", "failed")
 		} else {
 			args = append(args, "status", "success")
 		}
+
 		args = append(args, "duration", time.Now().UTC().Sub(startTime))
+
 		s.log.Info("job finished", args...)
 	}()
 
 	var cached bool
+
 	cacheKey := job.GetCacheKey()
+
 	if s.cache != nil {
-		var err error
-		resp, err = s.cache.Get(ctx, cacheKey)
-		if err == nil {
+		var errCache error
+
+		resp, errCache = s.cache.Get(ctx, cacheKey)
+		if errCache == nil {
 			cached = true
 		}
 	}
@@ -245,11 +288,13 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 		resp = s.doFetch(ctx, job)
 		if resp.Error != nil {
 			err = resp.Error
+
 			return
 		}
+
 		if s.cache != nil {
-			if err := s.cache.Set(ctx, cacheKey, resp); err != nil {
-				s.log.Error("error while caching response", "error", err, "job", job)
+			if errCache := s.cache.Set(ctx, cacheKey, &resp); errCache != nil {
+				s.log.Error("error while caching response", "error", errCache, "job", job)
 			}
 		}
 	}
@@ -262,13 +307,15 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 			return
 		}
 	}
-	result, next, err = job.Process(ctx, resp)
+
+	result, next, err = job.Process(ctx, &resp)
 	if err != nil {
 		// TODO shall I retry?
 		s.log.Error("error while processing job", "error", err)
 		return
 	}
-	return
+
+	return result, next, nil
 }
 
 func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
@@ -278,13 +325,19 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 			ans.Error = fmt.Errorf("status code %d", ans.StatusCode)
 		}
 	}()
+
 	maxRetries := s.getMaxRetries(job)
-	delay := time.Millisecond * 100
+
+	const defaultMilliseconds = 100
+
+	delay := time.Millisecond * defaultMilliseconds
 	retryPolicy := job.GetRetryPolicy()
 	retry := 0
+
 	for {
 		ans = s.httpFetcher.Fetch(ctx, job)
-		ok = job.DoCheckResponse(ans)
+		ok = job.DoCheckResponse(&ans)
+
 		if ok {
 			return
 		}
@@ -297,32 +350,38 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 		if retryPolicy == StopScraping {
 			s.log.Warn("stopping scraping because of policy")
 			s.cancelFn(errors.New("stopping scraping because of policy"))
+
 			return
 		}
 
 		if retry >= maxRetries {
 			return
 		}
+
 		retry++
+
 		switch retryPolicy {
 		case RetryJob:
 			time.Sleep(delay)
+
 			if delay > job.GetMaxRetryDelay() {
 				delay = job.GetMaxRetryDelay()
 			} else {
-				delay = delay * 2
+				delay *= 2
 			}
-		case RefreshIP:
-			// TODO
+		case RefreshIP: // TODO Implement
 		}
 	}
 }
 
 func (s *ScrapeMate) getMaxRetries(job IJob) int {
+	const maxRetriesDefault = 5
+
 	maxRetries := job.GetMaxRetries()
-	if maxRetries > 5 {
-		maxRetries = 5
+	if maxRetries > maxRetriesDefault {
+		maxRetries = maxRetriesDefault
 	}
+
 	return maxRetries
 }
 
@@ -338,34 +397,40 @@ func (s *ScrapeMate) Err() error {
 
 func (s *ScrapeMate) waitForSignal(sigChan <-chan os.Signal) {
 	go func() {
-		select {
-		case <-sigChan:
-			s.log.Info("received signal, shutting down")
-			s.cancelFn(ErrorExitSignal)
-		}
+		<-sigChan
+		s.log.Info("received signal, shutting down")
+		s.cancelFn(ErrorExitSignal)
 	}()
 }
 
 func (s *ScrapeMate) startWorker(ctx context.Context) {
 	jobc, errc := s.jobProvider.Jobs(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case err := <-errc:
 			s.log.Error("error while getting jobs...going to wait a bit", "error", err)
+
 			time.Sleep(1 * time.Second)
+
 			jobc, errc = s.jobProvider.Jobs(ctx)
+
 			s.log.Info("restarted job provider")
 		case job := <-jobc:
 			ans, next, err := s.DoJob(ctx, job)
 			if err != nil {
 				s.log.Error("error while processing job", "error", err)
+
 				s.pushToFailedJobs(job)
+
 				continue
 			}
+
 			if err := s.finishJob(ctx, job, ans, next); err != nil {
 				s.log.Error("error while finishing job", "error", err)
+
 				s.pushToFailedJobs(job)
 			}
 		}
@@ -382,12 +447,14 @@ func (s *ScrapeMate) finishJob(ctx context.Context, job IJob, ans any, next []IJ
 	if err := s.pushJobs(ctx, next); err != nil {
 		return fmt.Errorf("%w: while pushing jobs", err)
 	}
+
 	if job.UseInResults() {
 		s.results <- Result{
 			Job:  job,
 			Data: ans,
 		}
 	}
+
 	return nil
 }
 
@@ -397,5 +464,8 @@ func (s *ScrapeMate) pushJobs(ctx context.Context, jobs []IJob) error {
 			return err
 		}
 	}
+
 	return nil
 }
+
+type contextKey string

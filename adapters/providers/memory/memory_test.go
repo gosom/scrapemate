@@ -1,4 +1,4 @@
-package memory
+package memory_test
 
 /*
 func TestNewMemoryProvider(t *testing.T) {

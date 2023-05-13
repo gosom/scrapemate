@@ -21,28 +21,32 @@ func NewLevelDBCache(path string) (*LevelDBCache, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &LevelDBCache{db: db}, nil
 }
 
 // Get gets a value from the cache.
-func (c *LevelDBCache) Get(ctx context.Context, key string) (scrapemate.Response, error) {
+func (c *LevelDBCache) Get(_ context.Context, key string) (scrapemate.Response, error) {
 	data, err := c.db.Get([]byte(key), nil)
 	if err != nil {
 		return scrapemate.Response{}, err
 	}
+
 	var response scrapemate.Response
 	if err := json.Unmarshal(data, &response); err != nil {
 		return scrapemate.Response{}, err
 	}
+
 	return response, nil
 }
 
 // Set sets a value to the cache.
-func (c *LevelDBCache) Set(ctx context.Context, key string, value scrapemate.Response) error {
+func (c *LevelDBCache) Set(_ context.Context, key string, value *scrapemate.Response) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
+
 	return c.db.Put([]byte(key), data, nil)
 }
 

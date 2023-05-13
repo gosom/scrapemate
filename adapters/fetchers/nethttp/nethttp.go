@@ -5,27 +5,26 @@ import (
 	"compress/gzip"
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync"
 
 	"github.com/gosom/scrapemate"
 )
 
-var _ scrapemate.HttpFetcher = (*httpFetch)(nil)
+var _ scrapemate.HTTPFetcher = (*httpFetch)(nil)
 
-type HttpClient interface {
+type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-func New(netClient HttpClient) *httpFetch {
+func New(netClient HTTPClient) scrapemate.HTTPFetcher {
 	return &httpFetch{
 		netClient: netClient,
 	}
 }
 
 type httpFetch struct {
-	netClient HttpClient
+	netClient HTTPClient
 }
 
 func (o *httpFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
@@ -57,15 +56,19 @@ func (o *httpFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.R
 	}
 
 	defer func() {
-		io.Copy(ioutil.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}()
+
 	ans.StatusCode = resp.StatusCode
 	ans.Headers = http.Header{}
+
 	for k, v := range resp.Header {
 		ans.Headers[k] = v
 	}
+
 	var reader io.ReadCloser
+
 	switch resp.Header.Get("Content-Encoding") {
 	case "gzip":
 		reader, err = gzip.NewReader(resp.Body)
@@ -77,8 +80,10 @@ func (o *httpFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.R
 	default:
 		reader = resp.Body
 	}
+
 	ans.Body, ans.Error = io.ReadAll(reader)
 	ans.URL = resp.Request.URL.String()
+
 	return ans
 }
 
@@ -89,8 +94,10 @@ var bufferPool = sync.Pool{
 }
 
 func getBuffer() *bytes.Buffer {
+	//nolint:errcheck // we don't care about errors here
 	b := bufferPool.Get().(*bytes.Buffer)
 	b.Reset()
+
 	return b
 }
 

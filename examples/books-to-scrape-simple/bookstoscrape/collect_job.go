@@ -16,7 +16,7 @@ type BookCollectJob struct {
 	scrapemate.Job
 }
 
-func (o *BookCollectJob) Process(ctx context.Context, resp scrapemate.Response) (any, []scrapemate.IJob, error) {
+func (o *BookCollectJob) Process(ctx context.Context, resp *scrapemate.Response) (any, []scrapemate.IJob, error) {
 	log := scrapemate.GetLoggerFromContext(ctx)
 	log.Info("processing book collect job")
 	doc, ok := resp.Document.(*goquery.Document)

@@ -23,6 +23,7 @@ func NewConfig(writers []scrapemate.ResultWriter, options ...func(*Config) error
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
+
 	return &cfg, nil
 }
 
@@ -30,6 +31,7 @@ func NewConfig(writers []scrapemate.ResultWriter, options ...func(*Config) error
 func WithConcurrency(concurrency int) func(*Config) error {
 	return func(o *Config) error {
 		o.Concurrency = concurrency
+
 		return o.validate()
 	}
 }
@@ -39,6 +41,7 @@ func WithCache(cacheType, cachePath string) func(*Config) error {
 	return func(o *Config) error {
 		o.CacheType = cacheType
 		o.CachePath = cachePath
+
 		return o.validate()
 	}
 }
@@ -47,9 +50,11 @@ func WithCache(cacheType, cachePath string) func(*Config) error {
 func WithJS(opts ...func(*jsOptions)) func(*Config) error {
 	return func(o *Config) error {
 		o.UseJS = true
+
 		for _, opt := range opts {
 			opt(&o.JSOpts)
 		}
+
 		return o.validate()
 	}
 }
@@ -60,7 +65,9 @@ func WithProvider(provider scrapemate.JobProvider) func(*Config) error {
 		if provider == nil {
 			return errors.New("provider cannot be nil")
 		}
+
 		o.Provider = provider
+
 		return nil
 	}
 }
@@ -69,6 +76,7 @@ func WithProvider(provider scrapemate.JobProvider) func(*Config) error {
 func WithUseSession() func(*Config) error {
 	return func(o *Config) error {
 		o.UseSession = true
+
 		return nil
 	}
 }
@@ -123,5 +131,6 @@ func (o *Config) validate() error {
 	once.Do(func() {
 		validate = validator.New()
 	})
+
 	return validate.Struct(o)
 }

@@ -7,16 +7,20 @@ import (
 	"github.com/playwright-community/playwright-go"
 )
 
-var _ scrapemate.HttpFetcher = (*jsFetch)(nil)
+var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 
-func New(headless bool) (*jsFetch, error) {
+func New(headless bool) (scrapemate.HTTPFetcher, error) {
 	if err := playwright.Install(); err != nil {
 		return nil, err
 	}
+
+	const poolSize = 10
+
 	ans := jsFetch{
 		headless: headless,
-		pool:     make(chan *browser, 10),
+		pool:     make(chan *browser, poolSize),
 	}
+
 	return &ans, nil
 }
 
@@ -54,16 +58,21 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 			Error: err,
 		}
 	}
+
 	defer o.PutBrowser(ctx, browser)
+
 	if job.GetTimeout() > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, job.GetTimeout())
+
 		defer cancel()
 	}
+
 	var page playwright.Page
 
 	if len(browser.ctx.Pages()) > 0 {
 		page = browser.ctx.Pages()[0]
+
 		for i := 1; i < len(browser.ctx.Pages()); i++ {
 			browser.ctx.Pages()[i].Close()
 		}
@@ -75,7 +84,9 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 			}
 		}
 	}
+
 	defer page.Close()
+
 	return job.BrowserActions(ctx, page)
 }
 
@@ -86,9 +97,9 @@ type browser struct {
 }
 
 func (o *browser) Close() {
-	o.ctx.Close()
-	o.browser.Close()
-	o.pw.Stop()
+	_ = o.ctx.Close()
+	_ = o.browser.Close()
+	_ = o.pw.Stop()
 }
 
 func newBrowser(headless bool) (*browser, error) {
@@ -96,6 +107,7 @@ func newBrowser(headless bool) (*browser, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	br, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(headless),
 		Args: []string{
@@ -103,22 +115,28 @@ func newBrowser(headless bool) (*browser, error) {
 			`--no-default-browser-check`,
 		},
 	})
+
 	if err != nil {
 		return nil, err
 	}
+
+	const defaultWidth, defaultHeight = 1920, 1080
+
 	bctx, err := br.NewContext(playwright.BrowserNewContextOptions{
 		Viewport: &playwright.BrowserNewContextOptionsViewport{
-			Width:  playwright.Int(1920),
-			Height: playwright.Int(1080),
+			Width:  playwright.Int(defaultWidth),
+			Height: playwright.Int(defaultHeight),
 		},
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	ans := browser{
 		pw:      pw,
 		browser: br,
 		ctx:     bctx,
 	}
+
 	return &ans, nil
 }
