@@ -411,6 +411,10 @@ func (s *ScrapeMate) startWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case err := <-errc:
+			if ctx.Err() == context.Canceled {
+				return
+			}
+
 			s.log.Error("error while getting jobs...going to wait a bit", "error", err)
 
 			time.Sleep(1 * time.Second)
