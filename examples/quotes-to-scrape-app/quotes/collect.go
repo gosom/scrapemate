@@ -9,7 +9,6 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/google/uuid"
-	"github.com/gosom/kit/logging"
 	"github.com/gosom/scrapemate"
 )
 
@@ -37,7 +36,7 @@ func NewQuoteCollectJob(u string) *QuoteCollectJob {
 
 // Process is the function that will be called by scrapemate to process the job
 func (o *QuoteCollectJob) Process(ctx context.Context, resp *scrapemate.Response) (any, []scrapemate.IJob, error) {
-	log := ctx.Value("log").(logging.Logger)
+	log := scrapemate.GetLoggerFromContext(ctx)
 	log.Info("processing quotes collect job")
 	doc, ok := resp.Document.(*goquery.Document)
 	if !ok {

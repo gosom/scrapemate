@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/gosom/kit/logging"
 	"github.com/gosom/scrapemate"
 )
 
@@ -14,7 +13,7 @@ type BookDetailJob struct {
 }
 
 func (o *BookDetailJob) Process(ctx context.Context, resp *scrapemate.Response) (any, []scrapemate.IJob, error) {
-	log := ctx.Value("log").(logging.Logger)
+	log := scrapemate.GetLoggerFromContext(ctx)
 	log.Info("processing book detail job")
 	doc, ok := resp.Document.(*goquery.Document)
 	if !ok {
