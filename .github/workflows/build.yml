@@ -30,6 +30,11 @@ jobs:
           go-version: ${{ matrix.go }}
           check-latest: true
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.52
+
       - name: Lint
         run: make lint
 
