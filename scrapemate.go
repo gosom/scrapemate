@@ -154,17 +154,6 @@ func WithCache(cache Cacher) func(*ScrapeMate) error {
 	}
 }
 
-// WithSession sets the session for the scrapemate
-// At the moment this only works when you use the WithJS option
-// for the html fetcher it has not effect
-func WithSession() func(*ScrapeMate) error {
-	return func(s *ScrapeMate) error {
-		s.useSession = true
-
-		return nil
-	}
-}
-
 // Scrapemate contains unexporter fields
 type ScrapeMate struct {
 	log         logging.Logger
@@ -177,7 +166,6 @@ type ScrapeMate struct {
 	cache       Cacher
 	results     chan Result
 	failedJobs  chan IJob
-	useSession  bool
 }
 
 // Start starts the scraper
