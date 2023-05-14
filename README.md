@@ -18,6 +18,7 @@ Scrapemate is a web crawling and scraping framework written in Golang. It is des
 - Caching (File/LevelDB/Custom)
 - Custom job providers (memory provider included)
 - Headless and Headful support when using JS rendering
+- Automatic cookie and session handling
 
 ## Installation
 

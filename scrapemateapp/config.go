@@ -72,10 +72,10 @@ func WithProvider(provider scrapemate.JobProvider) func(*Config) error {
 	}
 }
 
-// WithUseSession sets UseSession to true.
-func WithUseSession() func(*Config) error {
+// WithInitJob sets the initial job of the app.
+func WithInitJob(job scrapemate.IJob) func(*Config) error {
 	return func(o *Config) error {
-		o.UseSession = true
+		o.InitJob = job
 
 		return nil
 	}
@@ -121,10 +121,8 @@ type Config struct {
 	// Writers are the writers to use for writing the results.
 	// At least one writer must be provided.
 	Writers []scrapemate.ResultWriter `validate:"required,gt=0"`
-
-	// UseSession is whether to use a session for the scraper
-	// only works with JS enabled for now.
-	UseSession bool `validate:"omitempty"`
+	// InitJob is the job to initialize the app with.
+	InitJob scrapemate.IJob
 }
 
 func (o *Config) validate() error {

@@ -154,6 +154,21 @@ func WithCache(cache Cacher) func(*ScrapeMate) error {
 	}
 }
 
+// WithInitJob sets the first job to be processed
+// It will be processed before the jobs from the job provider
+// It is useful if you want to start the scraper with a specific job
+// instead of the first one from the job provider
+// A real use case is when you want to obtain some cookies before starting
+// the scraping process (e.g. login)
+// Important: The results from these job will be discarded !
+func WithInitJob(job IJob) func(*ScrapeMate) error {
+	return func(s *ScrapeMate) error {
+		s.initJob = job
+
+		return nil
+	}
+}
+
 // Scrapemate contains unexporter fields
 type ScrapeMate struct {
 	log         logging.Logger
@@ -166,6 +181,7 @@ type ScrapeMate struct {
 	cache       Cacher
 	results     chan Result
 	failedJobs  chan IJob
+	initJob     IJob
 }
 
 // Start starts the scraper
@@ -186,6 +202,10 @@ func (s *ScrapeMate) Start() error {
 
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)
 	s.waitForSignal(exitChan)
+
+	if err := s.processInitJob(s.ctx); err != nil {
+		return err
+	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(s.concurrency)
@@ -389,6 +409,42 @@ func (s *ScrapeMate) waitForSignal(sigChan <-chan os.Signal) {
 		s.log.Info("received signal, shutting down")
 		s.cancelFn(ErrorExitSignal)
 	}()
+}
+
+func (s *ScrapeMate) processInitJob(ctx context.Context) error {
+	if s.initJob == nil {
+		return nil
+	}
+
+	s.log.Info("processing init", "job", s.initJob)
+	defer s.log.Info("init job finished", "job", s.initJob)
+
+	var stack []IJob
+
+	if s.initJob != nil {
+		stack = append(stack, s.initJob)
+	}
+
+	var job IJob
+
+	for len(stack) > 0 {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		job, stack = stack[0], stack[1:]
+
+		_, next, err := s.DoJob(ctx, job)
+		if err != nil {
+			return err
+		}
+
+		stack = append(stack, next...)
+	}
+
+	return nil
 }
 
 func (s *ScrapeMate) startWorker(ctx context.Context) {

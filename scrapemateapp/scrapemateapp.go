@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/cookiejar"
 	"time"
 
 	"github.com/gosom/scrapemate"
@@ -118,6 +119,10 @@ func (app *ScrapemateApp) getMate(ctx context.Context) (*scrapemate.ScrapeMate, 
 		params = append(params, scrapemate.WithCache(app.cacher))
 	}
 
+	if app.cfg.InitJob != nil {
+		params = append(params, scrapemate.WithInitJob(app.cfg.InitJob))
+	}
+
 	return scrapemate.New(params...)
 }
 
@@ -152,9 +157,17 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 			return nil, err
 		}
 	default:
-		httpFetcher = fetcher.New(&http.Client{
+		cookieJar, err := cookiejar.New(nil)
+		if err != nil {
+			return nil, err
+		}
+
+		netClient := &http.Client{
 			Timeout: timeout,
-		})
+			Jar:     cookieJar,
+		}
+
+		httpFetcher = fetcher.New(netClient)
 	}
 
 	return httpFetcher, nil
