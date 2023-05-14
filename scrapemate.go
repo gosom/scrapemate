@@ -235,7 +235,7 @@ func (s *ScrapeMate) Failed() <-chan IJob {
 
 // DoJob scrapes a job and returns it's result
 func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJob, err error) {
-	ctx = context.WithValue(ctx, contextKey("log"), s.log.With("jobid", job.GetID()))
+	ctx = ContextWithLogger(ctx, s.log.With("jobid", job.GetID()))
 	startTime := time.Now().UTC()
 
 	s.log.Debug("starting job", "job", job)
@@ -471,5 +471,3 @@ func (s *ScrapeMate) pushJobs(ctx context.Context, jobs []IJob) error {
 
 	return nil
 }
-
-type contextKey string

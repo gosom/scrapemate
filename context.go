@@ -15,3 +15,10 @@ func GetLoggerFromContext(ctx context.Context) logging.Logger {
 
 	return log
 }
+
+// ContextWithLogger returns a new context with the logger
+func ContextWithLogger(ctx context.Context, logger logging.Logger) context.Context {
+	return context.WithValue(ctx, contextKey("log"), logger)
+}
+
+type contextKey string
