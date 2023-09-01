@@ -2,6 +2,7 @@ package scrapemateapp
 
 import (
 	"errors"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gosom/scrapemate"
@@ -89,6 +90,15 @@ func Headfull() func(*jsOptions) {
 	}
 }
 
+// WithExitOnInactivity sets the duration after which the app will exit if there are no more jobs to run.
+func WithExitOnInactivity(duration time.Duration) func(*Config) error {
+	return func(o *Config) error {
+		o.ExitOnInactivityDuration = duration
+
+		return nil
+	}
+}
+
 type jsOptions struct {
 	// Headfull is a flag to run the browser in headfull mode.
 	// By default, the browser is run in headless mode.
@@ -123,6 +133,8 @@ type Config struct {
 	Writers []scrapemate.ResultWriter `validate:"required,gt=0"`
 	// InitJob is the job to initialize the app with.
 	InitJob scrapemate.IJob
+	// ExitOnInactivityDuration is whether to exit the app when there are no more jobs to run.
+	ExitOnInactivityDuration time.Duration
 }
 
 func (o *Config) validate() error {

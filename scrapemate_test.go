@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/gosom/kit/logging"
+
 	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/mock"
 )
@@ -186,6 +187,15 @@ func Test_New_With_Options(t *testing.T) {
 			require.Error(t, err)
 		})
 	})
+	t.Run("with exit on inactivity", func(t *testing.T) {
+		mate, err := scrapemate.New(
+			scrapemate.WithJobProvider(svc.provider),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
+			scrapemate.WithExitBecauseOfInactivity(1*time.Second),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, mate)
+	})
 }
 
 func Test_Done_Err(t *testing.T) {
@@ -212,6 +222,38 @@ func Test_Done_Err(t *testing.T) {
 
 func Test_Start(t *testing.T) {
 	svc := getMockedServices(t)
+	t.Run("exits when inactivity", func(t *testing.T) {
+		mate, err := scrapemate.New(
+			scrapemate.WithJobProvider(svc.provider),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
+			scrapemate.WithExitBecauseOfInactivity(time.Millisecond*500),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, mate)
+
+		svc.provider.EXPECT().Jobs(gomock.Any()).DoAndReturn(func(ctx context.Context) (<-chan scrapemate.Job, <-chan error) {
+			ch := make(chan scrapemate.Job)
+			errch := make(chan error)
+			return ch, errch
+		})
+
+		mateErr := func() <-chan error {
+			errc := make(chan error)
+			go func() {
+				errc <- mate.Start()
+			}()
+			return errc
+		}
+
+		select {
+		case err = <-mateErr():
+			require.NoError(t, err)
+		case <-time.After(2 * time.Minute):
+			require.Fail(t, "should be done")
+		}
+
+		require.NoError(t, mate.Err())
+	})
 	t.Run("exits when context is cancelled", func(t *testing.T) {
 		ctx, cancelFn := context.WithCancelCause(context.Background())
 		mate, err := scrapemate.New(

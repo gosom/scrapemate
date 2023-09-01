@@ -54,6 +54,15 @@ func New(options ...func(*ScrapeMate) error) (*ScrapeMate, error) {
 	return s, nil
 }
 
+func WithExitBecauseOfInactivity(duration time.Duration) func(*ScrapeMate) error {
+	return func(s *ScrapeMate) error {
+		s.exitOnInactivity = duration > 0
+		s.exitOnInactivityDuration = duration
+
+		return nil
+	}
+}
+
 // WithFailed sets the failed jobs channel for the scrapemate
 func WithFailed() func(*ScrapeMate) error {
 	return func(s *ScrapeMate) error {
@@ -182,6 +191,10 @@ type ScrapeMate struct {
 	results     chan Result
 	failedJobs  chan IJob
 	initJob     IJob
+
+	stats                    stats
+	exitOnInactivity         bool
+	exitOnInactivityDuration time.Duration
 }
 
 // Start starts the scraper
@@ -217,6 +230,53 @@ func (s *ScrapeMate) Start() error {
 			s.startWorker(s.ctx)
 		}()
 	}
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		startTime := time.Now().UTC()
+		tickerDur := time.Minute
+
+		const (
+			divider          = 2
+			secondsPerMinute = 60
+		)
+
+		if s.exitOnInactivity && s.exitOnInactivityDuration < tickerDur {
+			tickerDur = s.exitOnInactivityDuration / divider
+		}
+
+		ticker := time.NewTicker(tickerDur)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				numOfJobsCompleted, numOfJobsFailed, lastActivityAt := s.stats.getStats()
+				perMinute := float64(numOfJobsCompleted) / time.Now().UTC().Sub(startTime).Seconds() * secondsPerMinute
+
+				s.log.Info("scrapemate stats",
+					"numOfJobsCompleted", numOfJobsCompleted,
+					"numOfJobsFailed", numOfJobsFailed,
+					"lastActivityAt", lastActivityAt,
+					"speed", fmt.Sprintf("%.2f jobs/min", perMinute),
+				)
+
+				if s.exitOnInactivity && time.Now().UTC().Sub(lastActivityAt) > s.exitOnInactivityDuration {
+					err := fmt.Errorf("%w: %s", ErrInactivityTimeout, lastActivityAt.Format(time.RFC3339))
+
+					s.log.Info("exiting because of inactivity", "error", err)
+					s.cancelFn(err)
+
+					return
+				}
+			}
+		}
+	}()
 
 	wg.Wait()
 
@@ -400,7 +460,12 @@ func (s *ScrapeMate) Done() <-chan struct{} {
 
 // Err returns the error that caused scrapemate's context cancellation
 func (s *ScrapeMate) Err() error {
-	return context.Cause(s.ctx)
+	err := context.Cause(s.ctx)
+	if errors.Is(err, ErrInactivityTimeout) {
+		return nil
+	}
+
+	return err
 }
 
 func (s *ScrapeMate) waitForSignal(sigChan <-chan os.Signal) {
@@ -486,12 +551,16 @@ func (s *ScrapeMate) startWorker(ctx context.Context) {
 }
 
 func (s *ScrapeMate) pushToFailedJobs(job IJob) {
+	s.stats.incJobsFailed()
+
 	if s.failedJobs != nil {
 		s.failedJobs <- job
 	}
 }
 
 func (s *ScrapeMate) finishJob(ctx context.Context, job IJob, ans any, next []IJob) error {
+	s.stats.incJobsCompleted()
+
 	if err := s.pushJobs(ctx, next); err != nil {
 		return fmt.Errorf("%w: while pushing jobs", err)
 	}
@@ -514,4 +583,34 @@ func (s *ScrapeMate) pushJobs(ctx context.Context, jobs []IJob) error {
 	}
 
 	return nil
+}
+
+type stats struct {
+	l                  sync.RWMutex
+	numOfJobsCompleted int64
+	numOfJobsFailed    int64
+	lastActivityAt     time.Time
+}
+
+func (o *stats) getStats() (completed, failed int64, lastActivityAt time.Time) {
+	o.l.RLock()
+	defer o.l.RUnlock()
+
+	return o.numOfJobsCompleted, o.numOfJobsFailed, o.lastActivityAt
+}
+
+func (o *stats) incJobsCompleted() {
+	o.l.Lock()
+	defer o.l.Unlock()
+
+	o.numOfJobsCompleted++
+	o.lastActivityAt = time.Now().UTC()
+}
+
+func (o *stats) incJobsFailed() {
+	o.l.Lock()
+	defer o.l.Unlock()
+
+	o.numOfJobsFailed++
+	o.lastActivityAt = time.Now().UTC()
 }

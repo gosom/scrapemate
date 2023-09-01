@@ -113,6 +113,7 @@ func (app *ScrapemateApp) getMate(ctx context.Context) (*scrapemate.ScrapeMate, 
 		scrapemate.WithHTTPFetcher(fetcherInstance),
 		scrapemate.WithHTMLParser(parser.New()),
 		scrapemate.WithConcurrency(app.cfg.Concurrency),
+		scrapemate.WithExitBecauseOfInactivity(app.cfg.ExitOnInactivityDuration),
 	}
 
 	if app.cacher != nil {
