@@ -20,6 +20,8 @@ type IJob interface {
 	fmt.Stringer
 	// GetID returns the unique identifier of the job.
 	GetID() string
+	// GetParentID returns the parent id of the job
+	GetParentID() string
 	// GetMethod returns the http method to use
 	GetMethod() string
 	// GetBody returns the body of the request
@@ -61,6 +63,8 @@ type IJob interface {
 type Job struct {
 	// ID is an identifier for the job
 	ID string
+	// ParentID is the parent id of the job
+	ParentID string
 	// Method can be one valid HTTP method
 	Method string
 	// Body is the request's body
@@ -207,6 +211,11 @@ func (j *Job) GetMaxRetries() int {
 // GetID returns the unique identifier of the job.
 func (j *Job) GetID() string {
 	return j.ID
+}
+
+// GetParentID returns the parent id of the job
+func (j *Job) GetParentID() string {
+	return j.ParentID
 }
 
 // GetMethod returns the http method to use

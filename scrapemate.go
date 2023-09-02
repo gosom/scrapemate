@@ -357,7 +357,7 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 		if resp.Error != nil {
 			err = resp.Error
 
-			return
+			return nil, nil, err
 		}
 
 		if s.cache != nil {
@@ -372,7 +372,8 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 		resp.Document, err = s.htmlParser.Parse(ctx, resp.Body)
 		if err != nil {
 			s.log.Error("error while setting document", "error", err)
-			return
+
+			return nil, nil, err
 		}
 	}
 
@@ -380,7 +381,8 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 	if err != nil {
 		// TODO shall I retry?
 		s.log.Error("error while processing job", "error", err)
-		return
+
+		return nil, nil, err
 	}
 
 	return result, next, nil
@@ -407,23 +409,24 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 		ok = job.DoCheckResponse(&ans)
 
 		if ok {
-			return
+			return ans
 		}
 
 		if retryPolicy == DiscardJob {
 			s.log.Warn("discarding job because of policy")
-			return
+
+			return ans
 		}
 
 		if retryPolicy == StopScraping {
 			s.log.Warn("stopping scraping because of policy")
 			s.cancelFn(errors.New("stopping scraping because of policy"))
 
-			return
+			return ans
 		}
 
 		if retry >= maxRetries {
-			return
+			return ans
 		}
 
 		retry++
