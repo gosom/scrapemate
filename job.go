@@ -57,6 +57,8 @@ type IJob interface {
 	GetCacheKey() string
 	// UseInResults returns true if the job should be used in the results
 	UseInResults() bool
+	// ProcessOnFetchError returns true if the job should be processed even if the job failed
+	ProcessOnFetchError() bool
 }
 
 // Job is the base job that we may use
@@ -101,6 +103,11 @@ type Job struct {
 	// TakeScreenshot if true takes a screenshot of the page
 	TakeScreenshot bool
 	Response       Response
+}
+
+// ProcessOnFetchError returns true if the job should be processed even if the job failed
+func (j *Job) ProcessOnFetchError() bool {
+	return false
 }
 
 // UseInResults returns true if the job should be used in the results
