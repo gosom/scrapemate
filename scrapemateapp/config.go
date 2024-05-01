@@ -90,6 +90,12 @@ func Headfull() func(*jsOptions) {
 	}
 }
 
+func DisableImages() func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.DisableImages = true
+	}
+}
+
 // WithExitOnInactivity sets the duration after which the app will exit if there are no more jobs to run.
 func WithExitOnInactivity(duration time.Duration) func(*Config) error {
 	return func(o *Config) error {
@@ -102,7 +108,8 @@ func WithExitOnInactivity(duration time.Duration) func(*Config) error {
 type jsOptions struct {
 	// Headfull is a flag to run the browser in headfull mode.
 	// By default, the browser is run in headless mode.
-	Headfull bool
+	Headfull      bool
+	DisableImages bool
 }
 
 type Config struct {

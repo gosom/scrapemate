@@ -9,7 +9,7 @@ import (
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 
-func New(headless bool) (scrapemate.HTTPFetcher, error) {
+func New(headless, disableImages bool) (scrapemate.HTTPFetcher, error) {
 	if err := playwright.Install(); err != nil {
 		return nil, err
 	}
@@ -17,16 +17,18 @@ func New(headless bool) (scrapemate.HTTPFetcher, error) {
 	const poolSize = 10
 
 	ans := jsFetch{
-		headless: headless,
-		pool:     make(chan *browser, poolSize),
+		headless:      headless,
+		disableImages: disableImages,
+		pool:          make(chan *browser, poolSize),
 	}
 
 	return &ans, nil
 }
 
 type jsFetch struct {
-	headless bool
-	pool     chan *browser
+	headless      bool
+	disableImages bool
+	pool          chan *browser
 }
 
 func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
@@ -36,7 +38,7 @@ func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	case ans := <-o.pool:
 		return ans, nil
 	default:
-		return newBrowser(o.headless)
+		return newBrowser(o.headless, o.disableImages)
 	}
 }
 
@@ -102,19 +104,24 @@ func (o *browser) Close() {
 	_ = o.pw.Stop()
 }
 
-func newBrowser(headless bool) (*browser, error) {
+func newBrowser(headless, disableImages bool) (*browser, error) {
 	pw, err := playwright.Run()
 	if err != nil {
 		return nil, err
 	}
 
-	br, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
+	opts := playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(headless),
 		Args: []string{
 			`--start-maximized`,
 			`--no-default-browser-check`,
 		},
-	})
+	}
+	if disableImages {
+		opts.Args = append(opts.Args, `--blink-settings=imagesEnabled=false`)
+	}
+
+	br, err := pw.Chromium.Launch(opts)
 
 	if err != nil {
 		return nil, err
@@ -123,9 +130,9 @@ func newBrowser(headless bool) (*browser, error) {
 	const defaultWidth, defaultHeight = 1920, 1080
 
 	bctx, err := br.NewContext(playwright.BrowserNewContextOptions{
-		Viewport: &playwright.BrowserNewContextOptionsViewport{
-			Width:  playwright.Int(defaultWidth),
-			Height: playwright.Int(defaultHeight),
+		Viewport: &playwright.Size{
+			Width:  defaultWidth,
+			Height: defaultHeight,
 		},
 	})
 	if err != nil {
