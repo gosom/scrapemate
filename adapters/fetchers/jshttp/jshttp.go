@@ -9,7 +9,7 @@ import (
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 
-func New(headless, disableImages bool) (scrapemate.HTTPFetcher, error) {
+func New(headless, disableImages, firefox bool) (scrapemate.HTTPFetcher, error) {
 	if err := playwright.Install(); err != nil {
 		return nil, err
 	}
@@ -19,6 +19,7 @@ func New(headless, disableImages bool) (scrapemate.HTTPFetcher, error) {
 	ans := jsFetch{
 		headless:      headless,
 		disableImages: disableImages,
+		firefox:       firefox,
 		pool:          make(chan *browser, poolSize),
 	}
 
@@ -28,6 +29,7 @@ func New(headless, disableImages bool) (scrapemate.HTTPFetcher, error) {
 type jsFetch struct {
 	headless      bool
 	disableImages bool
+	firefox       bool
 	pool          chan *browser
 }
 
@@ -38,7 +40,7 @@ func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	case ans := <-o.pool:
 		return ans, nil
 	default:
-		return newBrowser(o.headless, o.disableImages)
+		return newBrowser(o.headless, o.disableImages, o.firefox)
 	}
 }
 
@@ -104,24 +106,43 @@ func (o *browser) Close() {
 	_ = o.pw.Stop()
 }
 
-func newBrowser(headless, disableImages bool) (*browser, error) {
+func newBrowser(headless, disableImages, firefox bool) (*browser, error) {
 	pw, err := playwright.Run()
 	if err != nil {
 		return nil, err
 	}
 
-	opts := playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(headless),
-		Args: []string{
-			`--start-maximized`,
-			`--no-default-browser-check`,
-		},
-	}
-	if disableImages {
-		opts.Args = append(opts.Args, `--blink-settings=imagesEnabled=false`)
-	}
+	var br playwright.Browser
 
-	br, err := pw.Chromium.Launch(opts)
+	if !firefox {
+		opts := playwright.BrowserTypeLaunchOptions{
+			Headless: playwright.Bool(headless),
+			Args: []string{
+				`--start-maximized`,
+				`--no-sandbox`,
+				`--no-default-browser-check`,
+				`--enable-automation=false`,
+				`--disable-blink-features=AutomationControlled`,
+			},
+		}
+
+		if disableImages {
+			opts.Args = append(opts.Args, `--blink-settings=imagesEnabled=false`)
+		}
+
+		br, err = pw.Chromium.Launch(opts)
+	} else {
+		br, err = pw.Firefox.Launch(playwright.BrowserTypeLaunchOptions{
+			Headless: playwright.Bool(headless),
+			Args: []string{
+				`--start-maximized`,
+				`--no-sandbox`,
+				`--no-default-browser-check`,
+				`--enable-automation=false`,
+				`--disable-blink-features=AutomationControlled`,
+			},
+		})
+	}
 
 	if err != nil {
 		return nil, err
@@ -129,11 +150,14 @@ func newBrowser(headless, disableImages bool) (*browser, error) {
 
 	const defaultWidth, defaultHeight = 1920, 1080
 
+	const ua = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
 	bctx, err := br.NewContext(playwright.BrowserNewContextOptions{
 		Viewport: &playwright.Size{
 			Width:  defaultWidth,
 			Height: defaultHeight,
 		},
+		UserAgent: playwright.String(ua),
 	})
 	if err != nil {
 		return nil, err

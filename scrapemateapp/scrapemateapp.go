@@ -153,7 +153,11 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 
 	switch app.cfg.UseJS {
 	case true:
-		httpFetcher, err = jsfetcher.New(!app.cfg.JSOpts.Headfull, app.cfg.JSOpts.DisableImages)
+		httpFetcher, err = jsfetcher.New(
+			!app.cfg.JSOpts.Headfull,
+			app.cfg.JSOpts.DisableImages,
+			app.cfg.JSOpts.Firefox,
+		)
 		if err != nil {
 			return nil, err
 		}

@@ -96,6 +96,12 @@ func DisableImages() func(*jsOptions) {
 	}
 }
 
+func Firefox() func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.Firefox = true
+	}
+}
+
 // WithExitOnInactivity sets the duration after which the app will exit if there are no more jobs to run.
 func WithExitOnInactivity(duration time.Duration) func(*Config) error {
 	return func(o *Config) error {
@@ -110,6 +116,7 @@ type jsOptions struct {
 	// By default, the browser is run in headless mode.
 	Headfull      bool
 	DisableImages bool
+	Firefox       bool
 }
 
 type Config struct {
