@@ -515,12 +515,8 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 			if err := s.refreshIP(ctx, currentVersion); err != nil {
 				s.log.Error("error while refreshing ip", "error", err)
 
-				s.cancelFn(err) // stoping scraping
-
 				return ans
 			}
-
-			delayFn()
 		}
 	}
 }
