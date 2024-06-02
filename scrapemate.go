@@ -395,11 +395,11 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 		}
 
 		//resp = s.doFetch(ctx, job)
-		//if !job.ProcessOnFetchError() && resp.Error != nil {
-		//	err = resp.Error
+		if !job.ProcessOnFetchError() && resp.Error != nil {
+			err = resp.Error
 
-		//	return nil, nil, err
-		//}
+			return nil, nil, err
+		}
 
 		//// check if resp.Error is valid because we may ProcessOnFetchError
 		//if resp.Error == nil && s.cache != nil {
