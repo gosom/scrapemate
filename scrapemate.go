@@ -456,6 +456,7 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 		}
 
 		s.activeReqs++
+		currentVersion := s.currentGwVersion
 		s.refreshCond.L.Unlock()
 
 		if job.UserAlternativeFetcher() {
@@ -511,7 +512,7 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 		case RetryJob:
 			delayFn()
 		case RefreshIP:
-			if err := s.refreshIP(ctx); err != nil {
+			if err := s.refreshIP(ctx, currentVersion); err != nil {
 				s.log.Error("error while refreshing ip", "error", err)
 
 				s.cancelFn(err) // stoping scraping
@@ -524,7 +525,7 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 	}
 }
 
-func (s *ScrapeMate) refreshIP(ctx context.Context) error {
+func (s *ScrapeMate) refreshIP(ctx context.Context, version int) error {
 	s.refreshCond.L.Lock()
 	defer s.refreshCond.L.Unlock()
 
@@ -533,18 +534,15 @@ func (s *ScrapeMate) refreshIP(ctx context.Context) error {
 		s.refreshCond.Wait()
 	}
 
-	s.refreshing = true
-
-	currentGwVersion := s.currentGwVersion + 1
-
-	if currentGwVersion <= s.currentGwVersion {
-		s.log.Info("ip already refreshed by another worker")
-
-		s.refreshing = false
-		s.refreshCond.Broadcast() // Notify other waiting workers
+	if version != int(s.currentGwVersion) {
+		s.log.Warn("gateway version changed, not refreshing ip")
 
 		return nil
 	}
+
+	s.refreshing = true
+
+	currentGwVersion := s.currentGwVersion + 1
 
 	t0 := time.Now().UTC()
 
@@ -562,10 +560,10 @@ func (s *ScrapeMate) refreshIP(ctx context.Context) error {
 
 	s.currentGwVersion = currentGwVersion
 
-	s.log.Info("ip refreshed", "duration", time.Now().UTC().Sub(t0))
-
 	s.refreshing = false
 	s.refreshCond.Broadcast() // Notify other waiting workers
+
+	s.log.Info("ip refreshed", "duration", time.Now().UTC().Sub(t0))
 
 	return nil
 }
