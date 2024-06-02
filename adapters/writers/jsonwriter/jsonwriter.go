@@ -24,8 +24,10 @@ func (c *jsonWriter) Run(_ context.Context, in <-chan scrapemate.Result) error {
 		items := asSlice(result.Data)
 
 		for i := range items {
-			if err := c.enc.Encode(items[i]); err != nil {
-				return err
+			if items[i] != nil {
+				if err := c.enc.Encode(items[i]); err != nil {
+					return err
+				}
 			}
 		}
 	}
