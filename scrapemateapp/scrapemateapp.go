@@ -116,6 +116,10 @@ func (app *ScrapemateApp) getMate(ctx context.Context) (*scrapemate.ScrapeMate, 
 		scrapemate.WithExitBecauseOfInactivity(app.cfg.ExitOnInactivityDuration),
 	}
 
+	if app.cfg.InternetProvider != nil {
+		params = append(params, scrapemate.WithInternetProvider(app.cfg.InternetProvider))
+	}
+
 	if app.cacher != nil {
 		params = append(params, scrapemate.WithCache(app.cacher))
 	}

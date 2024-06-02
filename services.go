@@ -44,3 +44,11 @@ type Cacher interface {
 type ResultWriter interface {
 	Run(ctx context.Context, in <-chan Result) error
 }
+
+// InternetProvider is an interface for internet providers
+// it helps scrapemate to get a new ip address
+//
+//go:generate mockgen -destination=mock/mock_internet_provider.go -package=mock . InternetProvider
+type InternetProvider interface {
+	RenewIP(ctx context.Context) error
+}

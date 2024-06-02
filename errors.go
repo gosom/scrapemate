@@ -20,6 +20,9 @@ var (
 	// ErrorNoCacher returned when you try to initialized with a nil Cacher
 	ErrorNoCacher = errors.New("no cacher set")
 	// ErrorNoCsvCapable returned when you try to write a csv file without a csv capable Data
-	ErrorNotCsvCapable   = errors.New("not csv capable")
+	ErrorNotCsvCapable = errors.New("not csv capable")
+	// ErrInactivityTimeout returned when the job provider is inactive for a long time
 	ErrInactivityTimeout = errors.New("inactivity timeout")
+	// ErrorNoInternetProvider returned when you try to initialized with a nil InternetProvider
+	ErrorNoInternetProvider = errors.New("no internet provider set")
 )

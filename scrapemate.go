@@ -16,7 +16,9 @@ import (
 
 // New creates a new scrapemate
 func New(options ...func(*ScrapeMate) error) (*ScrapeMate, error) {
-	s := &ScrapeMate{}
+	s := &ScrapeMate{
+		lock: &sync.RWMutex{},
+	}
 
 	for _, opt := range options {
 		if err := opt(s); err != nil {
@@ -178,6 +180,18 @@ func WithInitJob(job IJob) func(*ScrapeMate) error {
 	}
 }
 
+func WithInternetProvider(provider InternetProvider) func(*ScrapeMate) error {
+	return func(s *ScrapeMate) error {
+		if provider == nil {
+			return ErrorNoInternetProvider
+		}
+
+		s.internetProvider = provider
+
+		return nil
+	}
+}
+
 // Scrapemate contains unexporter fields
 type ScrapeMate struct {
 	log         logging.Logger
@@ -195,6 +209,10 @@ type ScrapeMate struct {
 	stats                    stats
 	exitOnInactivity         bool
 	exitOnInactivityDuration time.Duration
+
+	lock             *sync.RWMutex
+	currentGwVersion int64
+	internetProvider InternetProvider
 }
 
 // Start starts the scraper
@@ -215,6 +233,12 @@ func (s *ScrapeMate) Start() error {
 
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)
 	s.waitForSignal(exitChan)
+
+	if s.internetProvider != nil {
+		if err := s.refreshIP(s.ctx); err != nil {
+			return err
+		}
+	}
 
 	if err := s.processInitJob(s.ctx); err != nil {
 		return err
@@ -432,8 +456,7 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 
 		retry++
 
-		switch retryPolicy {
-		case RetryJob:
+		delayFn := func() {
 			time.Sleep(delay)
 
 			if delay > job.GetMaxRetryDelay() {
@@ -441,9 +464,55 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 			} else {
 				delay *= 2
 			}
-		case RefreshIP: // TODO Implement
+		}
+
+		switch retryPolicy {
+		case RetryJob:
+			delayFn()
+		case RefreshIP:
+			if err := s.refreshIP(ctx); err != nil {
+				s.log.Error("error while refreshing ip", "error", err)
+
+				s.cancelFn(err) // stoping scraping
+
+				return ans
+			}
+
+			delayFn()
 		}
 	}
+}
+
+func (s *ScrapeMate) refreshIP(ctx context.Context) error {
+	s.lock.RLock()
+	currentGwVersion := s.currentGwVersion + 1
+	s.lock.RUnlock()
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if currentGwVersion <= s.currentGwVersion {
+		s.log.Info("ip already refreshed by another worker")
+
+		return nil
+	}
+
+	t0 := time.Now().UTC()
+
+	if s.internetProvider == nil {
+		s.log.Warn("no internet provider set")
+	} else {
+		err := s.internetProvider.RenewIP(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	s.currentGwVersion = currentGwVersion
+
+	s.log.Info("ip refreshed", "duration", time.Now().UTC().Sub(t0))
+
+	return nil
 }
 
 func (s *ScrapeMate) getMaxRetries(job IJob) int {

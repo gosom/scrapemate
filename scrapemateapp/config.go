@@ -111,6 +111,14 @@ func WithExitOnInactivity(duration time.Duration) func(*Config) error {
 	}
 }
 
+func WithInternetProvider(provider scrapemate.InternetProvider) func(*Config) error {
+	return func(o *Config) error {
+		o.InternetProvider = provider
+
+		return nil
+	}
+}
+
 type jsOptions struct {
 	// Headfull is a flag to run the browser in headfull mode.
 	// By default, the browser is run in headless mode.
@@ -149,6 +157,8 @@ type Config struct {
 	InitJob scrapemate.IJob
 	// ExitOnInactivityDuration is whether to exit the app when there are no more jobs to run.
 	ExitOnInactivityDuration time.Duration
+
+	InternetProvider scrapemate.InternetProvider
 }
 
 func (o *Config) validate() error {
