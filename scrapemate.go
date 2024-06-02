@@ -254,7 +254,7 @@ func (s *ScrapeMate) Start() error {
 	s.waitForSignal(exitChan)
 
 	if s.internetProvider != nil {
-		if err := s.refreshIP(s.ctx); err != nil {
+		if err := s.refreshIP(s.ctx, s.currentGwVersion); err != nil {
 			return err
 		}
 	}
@@ -525,7 +525,7 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 	}
 }
 
-func (s *ScrapeMate) refreshIP(ctx context.Context, version int) error {
+func (s *ScrapeMate) refreshIP(ctx context.Context, version int64) error {
 	s.refreshCond.L.Lock()
 	defer s.refreshCond.L.Unlock()
 
@@ -534,7 +534,7 @@ func (s *ScrapeMate) refreshIP(ctx context.Context, version int) error {
 		s.refreshCond.Wait()
 	}
 
-	if version != int(s.currentGwVersion) {
+	if version != s.currentGwVersion {
 		s.log.Warn("gateway version changed, not refreshing ip")
 
 		return nil
