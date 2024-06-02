@@ -440,25 +440,6 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 		}
 	}()
 
-	// Wait if a refresh is in progress
-	s.refreshCond.L.Lock()
-	for s.refreshing {
-		s.refreshCond.Wait()
-	}
-
-	s.activeReqs++
-	s.refreshCond.L.Unlock()
-
-	defer func() {
-		s.refreshCond.L.Lock()
-		s.activeReqs--
-		if s.activeReqs == 0 {
-			s.refreshCond.Broadcast() // Notify if there are no active requests
-		}
-
-		s.refreshCond.L.Unlock()
-	}()
-
 	maxRetries := s.getMaxRetries(job)
 
 	const defaultMilliseconds = 100
@@ -468,11 +449,28 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 	retry := 0
 
 	for {
+		// Wait if a refresh is in progress
+		s.refreshCond.L.Lock()
+		for s.refreshing {
+			s.refreshCond.Wait()
+		}
+
+		s.activeReqs++
+		s.refreshCond.L.Unlock()
+
 		if job.UserAlternativeFetcher() {
 			ans = s.alternativeHTTPFetcher.Fetch(ctx, job)
 		} else {
 			ans = s.httpFetcher.Fetch(ctx, job)
 		}
+
+		s.refreshCond.L.Lock()
+		s.activeReqs--
+
+		if s.activeReqs == 0 {
+			s.refreshCond.Broadcast() // Notify if there are no active requests
+		}
+		s.refreshCond.L.Unlock()
 
 		ok = job.DoCheckResponse(&ans)
 
