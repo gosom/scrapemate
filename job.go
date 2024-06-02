@@ -59,6 +59,7 @@ type IJob interface {
 	UseInResults() bool
 	// ProcessOnFetchError returns true if the job should be processed even if the job failed
 	ProcessOnFetchError() bool
+	UserAlternativeFetcher() bool
 }
 
 // Job is the base job that we may use
@@ -101,8 +102,13 @@ type Job struct {
 	// MaxRetryDelay then it's capped to that. (Default is 2 seconds)
 	MaxRetryDelay time.Duration
 	// TakeScreenshot if true takes a screenshot of the page
-	TakeScreenshot bool
-	Response       Response
+	TakeScreenshot     bool
+	Response           Response
+	AlternativeFetcher bool
+}
+
+func (j *Job) UserAlternativeFetcher() bool {
+	return j.AlternativeFetcher
 }
 
 // ProcessOnFetchError returns true if the job should be processed even if the job failed

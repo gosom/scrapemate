@@ -82,6 +82,14 @@ func WithInitJob(job scrapemate.IJob) func(*Config) error {
 	}
 }
 
+func WithAlternativeFetcher() func(*Config) error {
+	return func(o *Config) error {
+		o.UseAlternativeFetcher = true
+
+		return nil
+	}
+}
+
 // Headfull is a helper function to create a headfull browser.
 // Use it as a parameter to WithJS.
 func Headfull() func(*jsOptions) {
@@ -141,7 +149,8 @@ type Config struct {
 	CachePath string `validate:"required_with=CacheType"`
 
 	// UseJS is whether to use JavaScript to render the page.
-	UseJS bool `validate:"omitempty"`
+	UseJS                 bool `validate:"omitempty"`
+	UseAlternativeFetcher bool `validate:"omitempty"`
 	// JSOpts are the options for the JavaScript renderer.
 	JSOpts jsOptions
 

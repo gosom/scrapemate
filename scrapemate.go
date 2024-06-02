@@ -139,6 +139,18 @@ func WithHTTPFetcher(client HTTPFetcher) func(*ScrapeMate) error {
 	}
 }
 
+func WithAlternativeHTTPFetcher(client HTTPFetcher) func(*ScrapeMate) error {
+	return func(s *ScrapeMate) error {
+		if client == nil {
+			return ErrorNoHTMLFetcher
+		}
+
+		s.alternativeHTTPFetcher = client
+
+		return nil
+	}
+}
+
 // WithHTMLParser sets the html parser for the scrapemate
 func WithHTMLParser(parser HTMLParser) func(*ScrapeMate) error {
 	return func(s *ScrapeMate) error {
@@ -194,17 +206,18 @@ func WithInternetProvider(provider InternetProvider) func(*ScrapeMate) error {
 
 // Scrapemate contains unexporter fields
 type ScrapeMate struct {
-	log         logging.Logger
-	ctx         context.Context
-	cancelFn    context.CancelCauseFunc
-	jobProvider JobProvider
-	concurrency int
-	httpFetcher HTTPFetcher
-	htmlParser  HTMLParser
-	cache       Cacher
-	results     chan Result
-	failedJobs  chan IJob
-	initJob     IJob
+	log                    logging.Logger
+	ctx                    context.Context
+	cancelFn               context.CancelCauseFunc
+	jobProvider            JobProvider
+	concurrency            int
+	httpFetcher            HTTPFetcher
+	alternativeHTTPFetcher HTTPFetcher
+	htmlParser             HTMLParser
+	cache                  Cacher
+	results                chan Result
+	failedJobs             chan IJob
+	initJob                IJob
 
 	stats                    stats
 	exitOnInactivity         bool
@@ -430,7 +443,12 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 	retry := 0
 
 	for {
-		ans = s.httpFetcher.Fetch(ctx, job)
+		if job.UserAlternativeFetcher() {
+			ans = s.alternativeHTTPFetcher.Fetch(ctx, job)
+		} else {
+			ans = s.httpFetcher.Fetch(ctx, job)
+		}
+
 		ok = job.DoCheckResponse(&ans)
 
 		if ok {

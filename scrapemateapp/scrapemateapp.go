@@ -107,6 +107,13 @@ func (app *ScrapemateApp) getMate(ctx context.Context) (*scrapemate.ScrapeMate, 
 		return nil, err
 	}
 
+	const altFetcherTimeout = 10 * time.Second
+
+	altFetcher, err := defaultHTTPFetcher(altFetcherTimeout)
+	if err != nil {
+		return nil, err
+	}
+
 	params := []func(*scrapemate.ScrapeMate) error{
 		scrapemate.WithContext(ctx, app.cancel),
 		scrapemate.WithJobProvider(app.provider),
@@ -114,6 +121,7 @@ func (app *ScrapemateApp) getMate(ctx context.Context) (*scrapemate.ScrapeMate, 
 		scrapemate.WithHTMLParser(parser.New()),
 		scrapemate.WithConcurrency(app.cfg.Concurrency),
 		scrapemate.WithExitBecauseOfInactivity(app.cfg.ExitOnInactivityDuration),
+		scrapemate.WithAlternativeHTTPFetcher(altFetcher),
 	}
 
 	if app.cfg.InternetProvider != nil {
@@ -166,20 +174,27 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 			return nil, err
 		}
 	default:
-		cookieJar, err := cookiejar.New(nil)
+		httpFetcher, err = defaultHTTPFetcher(timeout)
 		if err != nil {
 			return nil, err
 		}
-
-		netClient := &http.Client{
-			Timeout: timeout,
-			Jar:     cookieJar,
-		}
-
-		httpFetcher = fetcher.New(netClient)
 	}
 
 	return httpFetcher, nil
+}
+
+func defaultHTTPFetcher(timeout time.Duration) (scrapemate.HTTPFetcher, error) {
+	cookieJar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	netClient := &http.Client{
+		Timeout: timeout,
+		Jar:     cookieJar,
+	}
+
+	return fetcher.New(netClient), nil
 }
 
 //nolint:unparam // this function returns always nil error
