@@ -16,8 +16,11 @@ import (
 
 // New creates a new scrapemate
 func New(options ...func(*ScrapeMate) error) (*ScrapeMate, error) {
+	mu := &sync.Mutex{}
 	s := &ScrapeMate{
-		lock: &sync.RWMutex{},
+		lock:        &sync.RWMutex{},
+		refreshCond: sync.NewCond(mu),
+		refreshing:  false,
 	}
 
 	for _, opt := range options {
@@ -224,6 +227,8 @@ type ScrapeMate struct {
 	exitOnInactivityDuration time.Duration
 
 	lock             *sync.RWMutex
+	refreshCond      *sync.Cond
+	refreshing       bool
 	currentGwVersion int64
 	internetProvider InternetProvider
 }
@@ -390,23 +395,19 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 	case cached:
 		s.log.Debug("using cached response", "job", job)
 	default:
-		resp = Response{
-			Error: errors.New("no cached response"),
-		}
-
-		//resp = s.doFetch(ctx, job)
+		resp = s.doFetch(ctx, job)
 		if !job.ProcessOnFetchError() && resp.Error != nil {
 			err = resp.Error
 
 			return nil, nil, err
 		}
 
-		//// check if resp.Error is valid because we may ProcessOnFetchError
-		//if resp.Error == nil && s.cache != nil {
-		//	if errCache := s.cache.Set(ctx, cacheKey, &resp); errCache != nil {
-		//		s.log.Error("error while caching response", "error", errCache, "job", job)
-		//	}
-		//}
+		// check if resp.Error is valid because we may ProcessOnFetchError
+		if resp.Error == nil && s.cache != nil {
+			if errCache := s.cache.Set(ctx, cacheKey, &resp); errCache != nil {
+				s.log.Error("error while caching response", "error", errCache, "job", job)
+			}
+		}
 	}
 
 	// process the response if we have a html parser and the resp has no error
@@ -506,6 +507,15 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 }
 
 func (s *ScrapeMate) refreshIP(ctx context.Context) error {
+	s.refreshCond.L.Lock()
+
+	// If already refreshing, wait until the refresh is complete
+	for s.refreshing {
+		s.refreshCond.Wait()
+	}
+
+	s.refreshing = true
+
 	s.lock.RLock()
 	currentGwVersion := s.currentGwVersion + 1
 	s.lock.RUnlock()
@@ -515,6 +525,10 @@ func (s *ScrapeMate) refreshIP(ctx context.Context) error {
 
 	if currentGwVersion <= s.currentGwVersion {
 		s.log.Info("ip already refreshed by another worker")
+
+		s.refreshing = false
+		s.refreshCond.Broadcast() // Notify other waiting workers
+		s.refreshCond.L.Unlock()
 
 		return nil
 	}
@@ -526,6 +540,10 @@ func (s *ScrapeMate) refreshIP(ctx context.Context) error {
 	} else {
 		err := s.internetProvider.RenewIP(ctx)
 		if err != nil {
+			s.refreshing = false
+			s.refreshCond.Broadcast() // Notify other waiting workers
+			s.refreshCond.L.Unlock()
+
 			return err
 		}
 	}
@@ -533,6 +551,10 @@ func (s *ScrapeMate) refreshIP(ctx context.Context) error {
 	s.currentGwVersion = currentGwVersion
 
 	s.log.Info("ip refreshed", "duration", time.Now().UTC().Sub(t0))
+
+	s.refreshing = false
+	s.refreshCond.Broadcast() // Notify other waiting workers
+	s.refreshCond.L.Unlock()
 
 	return nil
 }
