@@ -390,19 +390,23 @@ func (s *ScrapeMate) DoJob(ctx context.Context, job IJob) (result any, next []IJ
 	case cached:
 		s.log.Debug("using cached response", "job", job)
 	default:
-		resp = s.doFetch(ctx, job)
-		if !job.ProcessOnFetchError() && resp.Error != nil {
-			err = resp.Error
-
-			return nil, nil, err
+		resp = Response{
+			Error: errors.New("no cached response"),
 		}
 
-		// check if resp.Error is valid because we may ProcessOnFetchError
-		if resp.Error == nil && s.cache != nil {
-			if errCache := s.cache.Set(ctx, cacheKey, &resp); errCache != nil {
-				s.log.Error("error while caching response", "error", errCache, "job", job)
-			}
-		}
+		//resp = s.doFetch(ctx, job)
+		//if !job.ProcessOnFetchError() && resp.Error != nil {
+		//	err = resp.Error
+
+		//	return nil, nil, err
+		//}
+
+		//// check if resp.Error is valid because we may ProcessOnFetchError
+		//if resp.Error == nil && s.cache != nil {
+		//	if errCache := s.cache.Set(ctx, cacheKey, &resp); errCache != nil {
+		//		s.log.Error("error while caching response", "error", errCache, "job", job)
+		//	}
+		//}
 	}
 
 	// process the response if we have a html parser and the resp has no error
