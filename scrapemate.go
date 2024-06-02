@@ -229,6 +229,7 @@ type ScrapeMate struct {
 	lock             *sync.RWMutex
 	refreshCond      *sync.Cond
 	refreshing       bool
+	activeReqs       int
 	currentGwVersion int64
 	internetProvider InternetProvider
 }
@@ -439,6 +440,25 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 		}
 	}()
 
+	// Wait if a refresh is in progress
+	s.refreshCond.L.Lock()
+	for s.refreshing {
+		s.refreshCond.Wait()
+	}
+
+	s.activeReqs++
+	s.refreshCond.L.Unlock()
+
+	defer func() {
+		s.refreshCond.L.Lock()
+		s.activeReqs--
+		if s.activeReqs == 0 {
+			s.refreshCond.Broadcast() // Notify if there are no active requests
+		}
+
+		s.refreshCond.L.Unlock()
+	}()
+
 	maxRetries := s.getMaxRetries(job)
 
 	const defaultMilliseconds = 100
@@ -508,27 +528,22 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 
 func (s *ScrapeMate) refreshIP(ctx context.Context) error {
 	s.refreshCond.L.Lock()
+	defer s.refreshCond.L.Unlock()
 
-	// If already refreshing, wait until the refresh is complete
-	for s.refreshing {
+	// Wait until there are no active requests
+	for s.activeReqs > 0 {
 		s.refreshCond.Wait()
 	}
 
 	s.refreshing = true
 
-	s.lock.RLock()
 	currentGwVersion := s.currentGwVersion + 1
-	s.lock.RUnlock()
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
 
 	if currentGwVersion <= s.currentGwVersion {
 		s.log.Info("ip already refreshed by another worker")
 
 		s.refreshing = false
 		s.refreshCond.Broadcast() // Notify other waiting workers
-		s.refreshCond.L.Unlock()
 
 		return nil
 	}
@@ -542,7 +557,6 @@ func (s *ScrapeMate) refreshIP(ctx context.Context) error {
 		if err != nil {
 			s.refreshing = false
 			s.refreshCond.Broadcast() // Notify other waiting workers
-			s.refreshCond.L.Unlock()
 
 			return err
 		}
@@ -554,7 +568,6 @@ func (s *ScrapeMate) refreshIP(ctx context.Context) error {
 
 	s.refreshing = false
 	s.refreshCond.Broadcast() // Notify other waiting workers
-	s.refreshCond.L.Unlock()
 
 	return nil
 }
