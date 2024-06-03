@@ -512,6 +512,8 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 		case RetryJob:
 			delayFn()
 		case RefreshIP:
+			s.log.Warn("refreshing ip because of policy", "url", job.GetURL(), "retry", retry, "maxRetries", maxRetries, "delay", delay, "version", currentVersion)
+
 			if err := s.refreshIP(ctx, currentVersion); err != nil {
 				s.log.Error("error while refreshing ip", "error", err)
 
@@ -523,7 +525,13 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 
 func (s *ScrapeMate) refreshIP(ctx context.Context, version int64) error {
 	s.refreshCond.L.Lock()
-	defer s.refreshCond.L.Unlock()
+	defer func() {
+		s.refreshing = false
+		s.refreshCond.Broadcast()
+		s.refreshCond.L.Unlock()
+	}()
+
+	s.refreshing = true
 
 	// Wait until there are no active requests
 	for s.activeReqs > 0 {
@@ -536,8 +544,6 @@ func (s *ScrapeMate) refreshIP(ctx context.Context, version int64) error {
 		return nil
 	}
 
-	s.refreshing = true
-
 	currentGwVersion := s.currentGwVersion + 1
 
 	t0 := time.Now().UTC()
@@ -547,17 +553,11 @@ func (s *ScrapeMate) refreshIP(ctx context.Context, version int64) error {
 	} else {
 		err := s.internetProvider.RenewIP(ctx)
 		if err != nil {
-			s.refreshing = false
-			s.refreshCond.Broadcast() // Notify other waiting workers
-
 			return err
 		}
 	}
 
 	s.currentGwVersion = currentGwVersion
-
-	s.refreshing = false
-	s.refreshCond.Broadcast() // Notify other waiting workers
 
 	s.log.Info("ip refreshed", "duration", time.Now().UTC().Sub(t0))
 
