@@ -512,13 +512,18 @@ func (s *ScrapeMate) doFetch(ctx context.Context, job IJob) (ans Response) {
 		case RetryJob:
 			delayFn()
 		case RefreshIP:
-			s.log.Warn("refreshing ip because of policy", "url", job.GetURL(), "retry", retry, "maxRetries", maxRetries, "delay", delay, "version", currentVersion)
+			s.log.Warn("refreshing ip because of policy",
+				"url", job.GetURL(), "retry", retry, "maxRetries", maxRetries, "delay", delay, "version", currentVersion,
+				"status", ans.StatusCode, "error", ans.Error,
+			)
 
 			if err := s.refreshIP(ctx, currentVersion); err != nil {
 				s.log.Error("error while refreshing ip", "error", err)
 
 				return ans
 			}
+
+			delayFn()
 		}
 	}
 }
