@@ -673,6 +673,12 @@ func (s *ScrapeMate) startWorker(ctx context.Context) {
 
 				s.pushToFailedJobs(job)
 			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+			}
 		}
 	}
 }
