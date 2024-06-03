@@ -38,6 +38,16 @@ func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case ans := <-o.pool:
+		_ = ans.ctx.ClearCookies()
+
+		for _, p := range ans.ctx.Pages() {
+			_ = p.Close()
+		}
+
+		for _, bctx := range ans.browser.Contexts() {
+			_ = bctx.ClearCookies()
+		}
+
 		return ans, nil
 	default:
 		return newBrowser(o.headless, o.disableImages, o.firefox)
