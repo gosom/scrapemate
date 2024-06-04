@@ -9,6 +9,7 @@ require (
 	github.com/go-playground/validator/v10 v10.20.0
 	github.com/golang/mock v1.6.0
 	github.com/gosom/kit v0.0.0-20230309082109-543b32ac686a
+	github.com/jonfriesen/playwright-go-stealth v0.0.1
 	github.com/playwright-community/playwright-go v0.4201.1
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.0
@@ -25,7 +26,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/jonfriesen/playwright-go-stealth v0.0.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
