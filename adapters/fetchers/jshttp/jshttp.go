@@ -5,6 +5,8 @@ import (
 
 	"github.com/gosom/scrapemate"
 	"github.com/playwright-community/playwright-go"
+
+	stealth "github.com/jonfriesen/playwright-go-stealth"
 )
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
@@ -101,6 +103,13 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 
 	defer page.Close()
 
+	err = stealth.Inject(page)
+	if err != nil {
+		return scrapemate.Response{
+			Error: err,
+		}
+	}
+
 	return job.BrowserActions(ctx, page)
 }
 
@@ -160,7 +169,10 @@ func newBrowser(headless, disableImages, firefox bool) (*browser, error) {
 
 	const defaultWidth, defaultHeight = 1920, 1080
 
-	const ua = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+	//nolint:gocritic // just keep it here for reference
+	// const ua = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
+	const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/601.3.9 (KHTML, like Gecko) Version/9.0.2 Safari/601.3.9"
 
 	bctx, err := br.NewContext(playwright.BrowserNewContextOptions{
 		Viewport: &playwright.Size{
@@ -168,6 +180,11 @@ func newBrowser(headless, disableImages, firefox bool) (*browser, error) {
 			Height: defaultHeight,
 		},
 		UserAgent: playwright.String(ua),
+		ExtraHttpHeaders: map[string]string{
+			"Cache-Control":      "no-cache",
+			"Sec-Ch-Ua":          `"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`,
+			"Sec-Ch-Ua-Platform": "macOS",
+		},
 	})
 	if err != nil {
 		return nil, err
