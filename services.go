@@ -20,6 +20,7 @@ type JobProvider interface {
 //go:generate mockgen -destination=mock/mock_http_fetcher.go -package=mock . HTTPFetcher
 type HTTPFetcher interface {
 	Fetch(ctx context.Context, job IJob) Response
+	CloseIdleConnections()
 }
 
 // HTMLParser is an interface for html parsers

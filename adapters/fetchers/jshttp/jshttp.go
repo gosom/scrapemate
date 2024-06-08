@@ -35,6 +35,9 @@ type jsFetch struct {
 	pool          chan *browser
 }
 
+func (o *jsFetch) CloseIdleConnections() {
+}
+
 func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	select {
 	case <-ctx.Done():

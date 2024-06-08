@@ -15,6 +15,7 @@ var _ scrapemate.HTTPFetcher = (*httpFetch)(nil)
 
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
+	CloseIdleConnections()
 }
 
 func New(netClient HTTPClient) scrapemate.HTTPFetcher {
@@ -25,6 +26,10 @@ func New(netClient HTTPClient) scrapemate.HTTPFetcher {
 
 type httpFetch struct {
 	netClient HTTPClient
+}
+
+func (o *httpFetch) CloseIdleConnections() {
+	o.netClient.CloseIdleConnections()
 }
 
 func (o *httpFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {

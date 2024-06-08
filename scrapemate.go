@@ -564,6 +564,11 @@ func (s *ScrapeMate) refreshIP(ctx context.Context, version int64) error {
 
 	s.currentGwVersion = currentGwVersion
 
+	s.httpFetcher.CloseIdleConnections()
+	if s.alternativeHTTPFetcher != nil {
+		s.alternativeHTTPFetcher.CloseIdleConnections()
+	}
+
 	s.log.Info("ip refreshed", "duration", time.Now().UTC().Sub(t0))
 
 	return nil
