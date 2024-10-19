@@ -27,4 +27,4 @@ test-cover-report: ## an html report of the coverage statistics
 	open coverage.html
 
 lint: ## runs the linter
-	golangci-lint -v run ./...
+	go generate -v ./lint.go

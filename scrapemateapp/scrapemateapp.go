@@ -59,6 +59,7 @@ func (app *ScrapemateApp) Start(ctx context.Context, seedJobs ...scrapemate.IJob
 				cancel(err)
 				return err
 			}
+
 			return nil
 		})
 	}
