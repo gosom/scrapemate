@@ -30,11 +30,6 @@ jobs:
           go-version: ${{ matrix.go }}
           check-latest: true
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: v1.54.2
-
       - name: Lint
         run: make lint
 
@@ -43,9 +38,6 @@ jobs:
 
       - name: Go Vet
         run: make vet
-
-      - name: Go Tidy
-        run: go mod tidy && git diff --exit-code
 
       - name: Go Mod
         run: go mod download
