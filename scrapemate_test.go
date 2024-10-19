@@ -231,9 +231,10 @@ func Test_Start(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, mate)
 
-		svc.provider.EXPECT().Jobs(gomock.Any()).DoAndReturn(func(ctx context.Context) (<-chan scrapemate.Job, <-chan error) {
+		svc.provider.EXPECT().Jobs(gomock.Any()).DoAndReturn(func(context.Context) (<-chan scrapemate.Job, <-chan error) {
 			ch := make(chan scrapemate.Job)
 			errch := make(chan error)
+
 			return ch, errch
 		})
 
@@ -242,6 +243,7 @@ func Test_Start(t *testing.T) {
 			go func() {
 				errc <- mate.Start()
 			}()
+
 			return errc
 		}
 
@@ -263,26 +265,35 @@ func Test_Start(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
-		svc.provider.EXPECT().Jobs(ctx).DoAndReturn(func(ctx context.Context) (<-chan scrapemate.Job, <-chan error) {
+
+		svc.provider.EXPECT().Jobs(ctx).DoAndReturn(func(context.Context) (<-chan scrapemate.Job, <-chan error) {
 			ch := make(chan scrapemate.Job)
 			errch := make(chan error)
+
 			return ch, errch
 		})
+
 		errc := func() <-chan error {
 			ans := make(chan error, 1)
 			go func() {
 				defer close(ans)
+
 				ans <- mate.Start()
 			}()
+
 			return ans
 		}()
+
 		cancelFn(errors.New("test"))
+
 		select {
 		case <-mate.Done():
 		default:
 			require.Fail(t, "should be done")
 		}
+
 		err = <-errc
+
 		require.Error(t, err)
 		require.Equal(t, "test", err.Error())
 		require.Equal(t, "test", mate.Err().Error())
@@ -294,18 +305,22 @@ func Test_Start(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
-		svc.provider.EXPECT().Jobs(gomock.Any()).DoAndReturn(func(ctx context.Context) (<-chan scrapemate.Job, <-chan error) {
+		svc.provider.EXPECT().Jobs(gomock.Any()).DoAndReturn(func(context.Context) (<-chan scrapemate.Job, <-chan error) {
 			ch := make(chan scrapemate.Job)
 			errch := make(chan error)
+
 			return ch, errch
 		})
+
 		mateErr := func() <-chan error {
 			errc := make(chan error)
 			go func() {
 				errc <- mate.Start()
 			}()
+
 			return errc
 		}
+
 		select {
 		case err = <-mateErr():
 			require.NoError(t, err)
@@ -317,6 +332,7 @@ func Test_Start(t *testing.T) {
 	})
 	t.Run("handles job provider errors", func(t *testing.T) {
 		ctx, cancelFn := context.WithCancelCause(context.Background())
+
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
 			scrapemate.WithHTTPFetcher(svc.fetcher),
@@ -324,23 +340,31 @@ func Test_Start(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		errch := func() <-chan error {
 			ans := make(chan error, 1)
+
 			ans <- errors.New("test")
+
 			return ans
 		}()
+
 		ch := func() <-chan scrapemate.IJob {
 			ans := make(chan scrapemate.IJob)
+
 			return ans
 		}()
+
 		svc.provider.EXPECT().Jobs(gomock.Any()).Return(nil, errch)
 		svc.provider.EXPECT().Jobs(gomock.Any()).Return(ch, nil)
 
 		mateErr := func() <-chan error {
 			errc := make(chan error)
+
 			go func() {
 				errc <- mate.Start()
 			}()
+
 			return errc
 		}()
 
@@ -357,8 +381,10 @@ func Test_Start(t *testing.T) {
 	})
 	t.Run("with one job with error", func(t *testing.T) {
 		svc := getMockedServices(t)
+
 		ctx, cancel := context.WithCancelCause(context.Background())
 		defer cancel(errors.New("defer exit"))
+
 		ch := func() <-chan scrapemate.IJob {
 			ans := make(chan scrapemate.IJob, 1)
 			j := testJobWithError{
@@ -366,18 +392,22 @@ func Test_Start(t *testing.T) {
 					URL: "http://example.com",
 				},
 			}
+
 			ans <- &j
+
 			return ans
 		}()
 		errch := func() <-chan error {
 			ans := make(chan error, 1)
 			return ans
 		}()
+
 		svc.provider.EXPECT().Jobs(ctx).Return(ch, errch)
 		svc.fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("test"),
 		})
+
 		mate, err := scrapemate.New(
 			scrapemate.WithContext(ctx, cancel),
 			scrapemate.WithHTTPFetcher(svc.fetcher),
@@ -389,9 +419,11 @@ func Test_Start(t *testing.T) {
 
 		mateErr := func() <-chan error {
 			errc := make(chan error)
+
 			go func() {
 				errc <- mate.Start()
 			}()
+
 			return errc
 		}()
 
@@ -412,32 +444,39 @@ func Test_Start(t *testing.T) {
 	})
 	t.Run("happy path with next", func(t *testing.T) {
 		svc := getMockedServices(t)
+
 		ctx, cancel := context.WithCancelCause(context.Background())
 		defer cancel(errors.New("defer exit"))
+
 		jobCh := make(chan scrapemate.IJob, 2)
 		j := testJobWithNext{
 			Job: scrapemate.Job{
 				URL: "http://example.com",
 			},
 		}
+
 		jobCh <- &j
+
 		errch := func() <-chan error {
 			ans := make(chan error, 1)
 			return ans
 		}()
+
 		svc.provider.EXPECT().Jobs(ctx).Return(jobCh, errch)
 		svc.fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("test"),
 		})
-		svc.provider.EXPECT().Push(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, job scrapemate.IJob) error {
+		svc.provider.EXPECT().Push(ctx, gomock.Any()).DoAndReturn(func(_ context.Context, job scrapemate.IJob) error {
 			jobCh <- job
+
 			return nil
 		})
 		svc.fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("test"),
 		})
+
 		mate, err := scrapemate.New(
 			scrapemate.WithContext(ctx, cancel),
 			scrapemate.WithHTTPFetcher(svc.fetcher),
@@ -446,15 +485,19 @@ func Test_Start(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		mateErr := func() <-chan error {
 			errc := make(chan error)
+
 			go func() {
 				errc <- mate.Start()
 			}()
+
 			return errc
 		}()
 
 		finished := mate.Results()
+
 		doneList, doneErr := func() (l []scrapemate.IJob, err error) {
 			for {
 				select {
@@ -474,11 +517,14 @@ func Test_Start(t *testing.T) {
 				}
 			}
 		}()
+
 		require.NoError(t, doneErr)
 		require.Len(t, doneList, 2)
 		require.Equal(t, "http://example.com", doneList[0].GetURL())
 		require.Equal(t, "http://example.com/next", doneList[1].GetURL())
+
 		cancel(scrapemate.ErrorExitSignal)
+
 		select {
 		case err := <-mateErr:
 			require.Equal(t, scrapemate.ErrorExitSignal, err)
@@ -488,8 +534,10 @@ func Test_Start(t *testing.T) {
 	})
 	t.Run("when push fails", func(t *testing.T) {
 		svc := getMockedServices(t)
+
 		ctx, cancel := context.WithCancelCause(context.Background())
 		defer cancel(errors.New("defer exit"))
+
 		ch := func() <-chan scrapemate.IJob {
 			ans := make(chan scrapemate.IJob, 1)
 			j := testJobWithNext{
@@ -498,18 +546,22 @@ func Test_Start(t *testing.T) {
 				},
 			}
 			ans <- &j
+
 			return ans
 		}()
+
 		errch := func() <-chan error {
 			ans := make(chan error, 1)
 			return ans
 		}()
+
 		svc.provider.EXPECT().Jobs(ctx).Return(ch, errch)
 		svc.fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("test"),
 		})
 		svc.provider.EXPECT().Push(gomock.Any(), gomock.Any()).Return(errors.New("error pushing"))
+
 		mate, err := scrapemate.New(
 			scrapemate.WithContext(ctx, cancel),
 			scrapemate.WithHTTPFetcher(svc.fetcher),
@@ -518,22 +570,27 @@ func Test_Start(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		mateErr := func() <-chan error {
 			errc := make(chan error)
 			go func() {
 				errc <- mate.Start()
 			}()
+
 			return errc
 		}()
 
 		failed := mate.Failed()
+
 		select {
 		case u := <-failed:
 			require.Equal(t, "http://example.com", u.GetURL())
 		case <-time.After(1 * time.Second):
 			require.Fail(t, "timeout")
 		}
+
 		cancel(scrapemate.ErrorExitSignal)
+
 		select {
 		case err := <-mateErr:
 			require.Equal(t, scrapemate.ErrorExitSignal, err)
@@ -587,9 +644,10 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
-		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job).Do(func(ctx context.Context, job *scrapemate.Job) {
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job).Do(func(context.Context, *scrapemate.Job) {
 			panic("test")
 		})
+
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
 	})
@@ -604,6 +662,7 @@ func Test_DoJob(t *testing.T) {
 			StatusCode: 400,
 			Body:       []byte("test"),
 		})
+
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
 	})
@@ -614,12 +673,16 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		job2 := job
+
 		job2.MaxRetries = 1
+
 		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job2).Return(scrapemate.Response{
 			StatusCode: 400,
 			Body:       []byte("test"),
 		}).Times(2)
+
 		_, _, err = mate.DoJob(ctx, &job2)
 		require.Error(t, err)
 	})
@@ -630,13 +693,17 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		job2 := job
+
 		job2.MaxRetries = 10
 		job2.MaxRetryDelay = 600 * time.Millisecond
+
 		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job2).Return(scrapemate.Response{
 			StatusCode: 400,
 			Body:       []byte("test"),
 		}).Times(6)
+
 		_, _, err = mate.DoJob(ctx, &job2)
 		require.Error(t, err)
 	})
@@ -647,16 +714,19 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		job2 := scrapemate.Job{
 			URL: "http://example.com",
 			CheckResponse: func(response *scrapemate.Response) bool {
 				return response.StatusCode == 301
 			},
 		}
+
 		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job2).Return(scrapemate.Response{
 			StatusCode: 301,
 			Body:       []byte("test"),
 		})
+
 		_, _, err = mate.DoJob(ctx, &job2)
 		require.NoError(t, err)
 	})
@@ -667,6 +737,7 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		job2 := scrapemate.Job{
 			URL:         "http://example.com",
 			RetryPolicy: scrapemate.StopScraping,
@@ -675,9 +746,12 @@ func Test_DoJob(t *testing.T) {
 			StatusCode: 400,
 			Body:       []byte("test"),
 		})
+
 		_, _, err = mate.DoJob(ctx, &job2)
 		require.Error(t, err)
+
 		var ctxDone bool
+
 		select {
 		case <-mate.Done():
 			ctxDone = true
@@ -694,6 +768,7 @@ func Test_DoJob(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		job2 := scrapemate.Job{
 			URL:         "http://example.com",
 			RetryPolicy: scrapemate.DiscardJob,
@@ -702,14 +777,18 @@ func Test_DoJob(t *testing.T) {
 			StatusCode: 400,
 			Body:       []byte("test"),
 		})
+
 		_, _, err = mate.DoJob(ctx, &job2)
 		require.Error(t, err)
+
 		var ctxDone bool
+
 		select {
 		case <-mate.Done():
 			ctxDone = true
 		default:
 		}
+
 		require.False(t, ctxDone)
 	})
 	t.Run("successResponse+parseError", func(t *testing.T) {
@@ -718,6 +797,7 @@ func Test_DoJob(t *testing.T) {
 			scrapemate.WithJobProvider(svc.provider),
 			scrapemate.WithHTMLParser(svc.parser),
 		)
+
 		require.NoError(t, err)
 		require.NotNil(t, mate)
 		svc.fetcher.EXPECT().Fetch(gomock.Any(), &job).Return(scrapemate.Response{
@@ -725,6 +805,7 @@ func Test_DoJob(t *testing.T) {
 			Body:       []byte("<html"),
 		})
 		svc.parser.EXPECT().Parse(gomock.Any(), gomock.Any()).Return(nil, errors.New("test"))
+
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
 	})
@@ -735,13 +816,16 @@ func Test_DoJob(t *testing.T) {
 			scrapemate.WithHTMLParser(svc.parser),
 			scrapemate.WithCache(svc.cache),
 		)
+
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		svc.cache.EXPECT().Get(gomock.Any(), job.GetCacheKey()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("<html></html>"),
 		}, nil)
 		svc.parser.EXPECT().Parse(gomock.Any(), gomock.Any()).Return(nil, errors.New("test"))
+
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
 	})
@@ -752,8 +836,10 @@ func Test_DoJob(t *testing.T) {
 			scrapemate.WithHTMLParser(svc.parser),
 			scrapemate.WithCache(svc.cache),
 		)
+
 		require.NoError(t, err)
 		require.NotNil(t, mate)
+
 		svc.cache.EXPECT().Get(gomock.Any(), job.GetCacheKey()).Return(scrapemate.Response{
 			StatusCode: 200,
 			Body:       []byte("<html></html>"),
@@ -764,6 +850,7 @@ func Test_DoJob(t *testing.T) {
 		})
 		svc.cache.EXPECT().Set(gomock.Any(), job.GetCacheKey(), gomock.Any()).Return(nil)
 		svc.parser.EXPECT().Parse(gomock.Any(), gomock.Any()).Return(nil, errors.New("test"))
+
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
 	})
