@@ -285,6 +285,12 @@ func (s *ScrapeMate) Start() error {
 	return s.Err()
 }
 
+func (s *ScrapeMate) Close() error {
+	_ = s.httpFetcher.Close()
+
+	return nil
+}
+
 // Concurrency returns how many workers are running in parallel
 func (s *ScrapeMate) Concurrency() int {
 	return s.concurrency

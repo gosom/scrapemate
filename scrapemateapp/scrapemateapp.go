@@ -51,6 +51,7 @@ func (app *ScrapemateApp) Start(ctx context.Context, seedJobs ...scrapemate.IJob
 	}
 
 	defer app.Close()
+	defer mate.Close()
 
 	for i := range app.cfg.Writers {
 		writer := app.cfg.Writers[i]

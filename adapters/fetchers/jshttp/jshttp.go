@@ -16,7 +16,13 @@ func New(headless, disableImages bool, rotator scrapemate.ProxyRotator) (scrapem
 
 	const poolSize = 10
 
+	pw, err := playwright.Run()
+	if err != nil {
+		return nil, err
+	}
+
 	ans := jsFetch{
+		pw:            pw,
 		headless:      headless,
 		disableImages: disableImages,
 		pool:          make(chan *browser, poolSize),
@@ -27,6 +33,7 @@ func New(headless, disableImages bool, rotator scrapemate.ProxyRotator) (scrapem
 }
 
 type jsFetch struct {
+	pw            *playwright.Playwright
 	headless      bool
 	disableImages bool
 	pool          chan *browser
@@ -40,13 +47,25 @@ func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	case ans := <-o.pool:
 		return ans, nil
 	default:
-		ans, err := newBrowser(o.headless, o.disableImages, o.rotator)
+		ans, err := newBrowser(o.pw, o.headless, o.disableImages, o.rotator)
 		if err != nil {
 			return nil, err
 		}
 
 		return ans, nil
 	}
+}
+
+func (o *jsFetch) Close() error {
+	close(o.pool)
+
+	for b := range o.pool {
+		b.Close()
+	}
+
+	_ = o.pw.Stop()
+
+	return nil
 }
 
 func (o *jsFetch) PutBrowser(ctx context.Context, b *browser) {
@@ -100,7 +119,6 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 }
 
 type browser struct {
-	pw      *playwright.Playwright
 	browser playwright.Browser
 	ctx     playwright.BrowserContext
 }
@@ -108,15 +126,9 @@ type browser struct {
 func (o *browser) Close() {
 	_ = o.ctx.Close()
 	_ = o.browser.Close()
-	_ = o.pw.Stop()
 }
 
-func newBrowser(headless, disableImages bool, rotator scrapemate.ProxyRotator) (*browser, error) {
-	pw, err := playwright.Run()
-	if err != nil {
-		return nil, err
-	}
-
+func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator scrapemate.ProxyRotator) (*browser, error) {
 	opts := playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(headless),
 		Args: []string{
@@ -173,7 +185,6 @@ func newBrowser(headless, disableImages bool, rotator scrapemate.ProxyRotator) (
 	}
 
 	ans := browser{
-		pw:      pw,
 		browser: br,
 		ctx:     bctx,
 	}

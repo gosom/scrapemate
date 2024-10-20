@@ -27,6 +27,10 @@ type httpFetch struct {
 	netClient HTTPClient
 }
 
+func (o *httpFetch) Close() error {
+	return nil
+}
+
 func (o *httpFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
 	u := job.GetFullURL()
 	reqBody := getBuffer()

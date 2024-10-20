@@ -156,8 +156,11 @@ func run() error {
 		}
 	}()
 
+	defer mate.Close()
+
 	err = mate.Start()
 	<-resultsDone
+
 	return err
 }
 
