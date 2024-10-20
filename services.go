@@ -2,6 +2,7 @@ package scrapemate
 
 import (
 	"context"
+	"net/http"
 )
 
 // JobProvider is an interface for job providers
@@ -43,4 +44,11 @@ type Cacher interface {
 //go:generate mockgen -destination=mock/mock_writer.go -package=mock . ResultWriter
 type ResultWriter interface {
 	Run(ctx context.Context, in <-chan Result) error
+}
+
+// ProxyRotator is an interface for proxy rotators
+//
+//go:generate mockgen -destination=mock/mock_proxy_rotator.go -package=mock . ProxyRotator
+type ProxyRotator interface {
+	RoundTrip(req *http.Request) (*http.Response, error)
 }
