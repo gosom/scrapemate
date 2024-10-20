@@ -16,6 +16,7 @@ import (
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
 	memprovider "github.com/gosom/scrapemate/adapters/providers/memory"
+	"github.com/gosom/scrapemate/adapters/proxy"
 )
 
 type ScrapemateApp struct {
@@ -148,13 +149,18 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 	var (
 		httpFetcher scrapemate.HTTPFetcher
 		err         error
+		rotator     scrapemate.ProxyRotator
 	)
+
+	if len(app.cfg.Proxies) > 0 {
+		rotator = proxy.New(app.cfg.Proxies, app.cfg.ProxyUsername, app.cfg.ProxyPassword)
+	}
 
 	const timeout = 10 * time.Second
 
 	switch app.cfg.UseJS {
 	case true:
-		httpFetcher, err = jsfetcher.New(!app.cfg.JSOpts.Headfull, app.cfg.JSOpts.DisableImages)
+		httpFetcher, err = jsfetcher.New(!app.cfg.JSOpts.Headfull, app.cfg.JSOpts.DisableImages, rotator)
 		if err != nil {
 			return nil, err
 		}
@@ -167,6 +173,10 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 		netClient := &http.Client{
 			Timeout: timeout,
 			Jar:     cookieJar,
+		}
+
+		if rotator != nil {
+			netClient.Transport = rotator
 		}
 
 		httpFetcher = fetcher.New(netClient)

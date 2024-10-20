@@ -44,12 +44,16 @@ func run() error {
 		cacheType   string
 		concurrency int
 		proxy       string
+		proxyUser   string
+		proxyPass   string
 	)
 
 	flag.BoolVar(&useJS, "js", false, "use javascript")
 	flag.StringVar(&cacheType, "cache", "", "use cache of type: file,leveldb DEFAULT: no cache")
 	flag.IntVar(&concurrency, "concurrency", 10, "concurrency")
 	flag.StringVar(&proxy, "proxy", "", "proxy to use")
+	flag.StringVar(&proxyUser, "proxy-user", "", "proxy user")
+	flag.StringVar(&proxyPass, "proxy-pass", "", "proxy pass")
 	flag.Parse()
 
 	// create a new memory provider
@@ -75,19 +79,27 @@ func run() error {
 		provider.Push(ctx, job)
 	}()
 
-	var httpFetcher scrapemate.HTTPFetcher
-	var err error
+	var (
+		httpFetcher scrapemate.HTTPFetcher
+		err         error
+	)
+
+	var rotator scrapemate.ProxyRotator
+
+	if len(proxy) > 0 {
+		rotator = proxyrotator.New([]string{proxy}, proxyUser, proxyPass)
+	}
+
 	switch useJS {
 	case true:
-		httpFetcher, err = jsfetcher.New(true, false)
+		httpFetcher, err = jsfetcher.New(true, false, rotator)
 		if err != nil {
 			return err
 		}
 	default:
 		var netClient *http.Client
 
-		if len(proxy) > 0 {
-			rotator := proxyrotator.New([]string{proxy})
+		if rotator != nil {
 			netClient = &http.Client{
 				Timeout:   10 * time.Second,
 				Transport: rotator,
