@@ -19,6 +19,7 @@ import (
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
 	provider "github.com/gosom/scrapemate/adapters/providers/memory"
+	proxyrotator "github.com/gosom/scrapemate/adapters/proxy"
 
 	"booktoscrapesimple/bookstoscrape"
 )
@@ -38,15 +39,26 @@ func run() error {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(errors.New("deferred cancel"))
 
-	var useJS bool
-	var cacheType string
-	var concurrency int
+	var (
+		useJS       bool
+		cacheType   string
+		concurrency int
+		proxy       string
+		proxyUser   string
+		proxyPass   string
+	)
+
 	flag.BoolVar(&useJS, "js", false, "use javascript")
 	flag.StringVar(&cacheType, "cache", "", "use cache of type: file,leveldb DEFAULT: no cache")
 	flag.IntVar(&concurrency, "concurrency", 10, "concurrency")
+	flag.StringVar(&proxy, "proxy", "", "proxy to use")
+	flag.StringVar(&proxyUser, "proxy-user", "", "proxy user")
+	flag.StringVar(&proxyPass, "proxy-pass", "", "proxy pass")
 	flag.Parse()
+
 	// create a new memory provider
 	provider := provider.New()
+
 	// we will start  a go routine that will push jobs to the provider
 	// here we need to extract all books from https://books.toscrape.com/
 	// In this case we just need to push the initial collect job
@@ -67,18 +79,38 @@ func run() error {
 		provider.Push(ctx, job)
 	}()
 
-	var httpFetcher scrapemate.HTTPFetcher
-	var err error
+	var (
+		httpFetcher scrapemate.HTTPFetcher
+		err         error
+	)
+
+	var rotator scrapemate.ProxyRotator
+
+	if len(proxy) > 0 {
+		rotator = proxyrotator.New([]string{proxy}, proxyUser, proxyPass)
+	}
+
 	switch useJS {
 	case true:
-		httpFetcher, err = jsfetcher.New(true)
+		httpFetcher, err = jsfetcher.New(true, false, rotator)
 		if err != nil {
 			return err
 		}
 	default:
-		httpFetcher = fetcher.New(&http.Client{
-			Timeout: 10 * time.Second,
-		})
+		var netClient *http.Client
+
+		if rotator != nil {
+			netClient = &http.Client{
+				Timeout:   10 * time.Second,
+				Transport: rotator,
+			}
+		} else {
+			netClient = &http.Client{
+				Timeout: 10 * time.Second,
+			}
+		}
+
+		httpFetcher = fetcher.New(netClient)
 	}
 
 	mate, err := scrapemate.New(

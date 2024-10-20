@@ -9,7 +9,7 @@ import (
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 
-func New(headless, disableImages bool) (scrapemate.HTTPFetcher, error) {
+func New(headless, disableImages bool, rotator scrapemate.ProxyRotator) (scrapemate.HTTPFetcher, error) {
 	if err := playwright.Install(); err != nil {
 		return nil, err
 	}
@@ -20,6 +20,7 @@ func New(headless, disableImages bool) (scrapemate.HTTPFetcher, error) {
 		headless:      headless,
 		disableImages: disableImages,
 		pool:          make(chan *browser, poolSize),
+		rotator:       rotator,
 	}
 
 	return &ans, nil
@@ -29,6 +30,7 @@ type jsFetch struct {
 	headless      bool
 	disableImages bool
 	pool          chan *browser
+	rotator       scrapemate.ProxyRotator
 }
 
 func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
@@ -38,7 +40,12 @@ func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	case ans := <-o.pool:
 		return ans, nil
 	default:
-		return newBrowser(o.headless, o.disableImages)
+		ans, err := newBrowser(o.headless, o.disableImages, o.rotator)
+		if err != nil {
+			return nil, err
+		}
+
+		return ans, nil
 	}
 }
 
@@ -104,7 +111,7 @@ func (o *browser) Close() {
 	_ = o.pw.Stop()
 }
 
-func newBrowser(headless, disableImages bool) (*browser, error) {
+func newBrowser(headless, disableImages bool, rotator scrapemate.ProxyRotator) (*browser, error) {
 	pw, err := playwright.Run()
 	if err != nil {
 		return nil, err
@@ -134,6 +141,32 @@ func newBrowser(headless, disableImages bool) (*browser, error) {
 			Width:  defaultWidth,
 			Height: defaultHeight,
 		},
+		Proxy: func() *playwright.Proxy {
+			if rotator == nil {
+				return nil
+			}
+
+			next := rotator.Next()
+
+			srv := "socks5://" + next
+			username, password := rotator.GetCredentials()
+
+			return &playwright.Proxy{
+				Server: srv,
+				Username: func() *string {
+					if username == "" {
+						return nil
+					}
+					return &username
+				}(),
+				Password: func() *string {
+					if password == "" {
+						return nil
+					}
+					return &password
+				}(),
+			}
+		}(),
 	})
 	if err != nil {
 		return nil, err

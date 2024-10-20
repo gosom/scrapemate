@@ -82,6 +82,33 @@ func WithInitJob(job scrapemate.IJob) func(*Config) error {
 	}
 }
 
+// WithProxies sets the proxies of the app.
+func WithProxies(proxies []string) func(*Config) error {
+	return func(o *Config) error {
+		o.Proxies = proxies
+
+		return nil
+	}
+}
+
+// WithProxyUsername sets the proxy username of the app.
+func WithProxyUsername(username string) func(*Config) error {
+	return func(o *Config) error {
+		o.ProxyUsername = username
+
+		return nil
+	}
+}
+
+// WithProxyPassword sets the proxy password of the app.
+func WithProxyPassword(password string) func(*Config) error {
+	return func(o *Config) error {
+		o.ProxyPassword = password
+
+		return nil
+	}
+}
+
 // Headfull is a helper function to create a headfull browser.
 // Use it as a parameter to WithJS.
 func Headfull() func(*jsOptions) {
@@ -142,6 +169,12 @@ type Config struct {
 	InitJob scrapemate.IJob
 	// ExitOnInactivityDuration is whether to exit the app when there are no more jobs to run.
 	ExitOnInactivityDuration time.Duration
+	// Proxies are the proxies to use for the app.
+	Proxies []string
+	// ProxyUsername is the username to use for the proxy.
+	ProxyUsername string
+	// ProxyPassword is the password to use for the proxy.
+	ProxyPassword string
 }
 
 func (o *Config) validate() error {
