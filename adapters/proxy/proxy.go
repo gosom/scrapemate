@@ -6,59 +6,63 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
+
+	"github.com/gosom/scrapemate"
 )
 
 type Rotator struct {
-	proxies  []string
-	username string
-	password string
-	current  uint32
-	cache    sync.Map
+	proxies []scrapemate.Proxy
+	current uint32
+	cache   sync.Map
 }
 
-func New(proxies []string, username, password string) *Rotator {
+func New(proxies []string) *Rotator {
 	if len(proxies) == 0 {
 		panic("no proxies provided")
 	}
 
+	plist := make([]scrapemate.Proxy, len(proxies))
+
+	for i := range proxies {
+		p, err := scrapemate.NewProxy(proxies[i])
+		if err != nil {
+			panic(err)
+		}
+
+		plist[i] = p
+	}
+
 	return &Rotator{
-		proxies:  proxies,
-		username: username,
-		password: password,
-		current:  0,
+		proxies: plist,
+		current: 0,
 	}
 }
 
-//nolint:gocritic // no need to change the signature
-func (pr *Rotator) GetCredentials() (string, string) {
-	return pr.username, pr.password
-}
-
-func (pr *Rotator) Next() string {
-	current := atomic.AddUint32(&pr.current, 1)
+func (pr *Rotator) Next() scrapemate.Proxy {
+	current := atomic.AddUint32(&pr.current, 1) - 1
 
 	return pr.proxies[current%uint32(len(pr.proxies))] //nolint:gosec // no overflow here
 }
 
 func (pr *Rotator) RoundTrip(req *http.Request) (*http.Response, error) {
-	proxyAddr := pr.Next()
+	next := pr.Next()
 
-	transport, ok := pr.cache.Load(proxyAddr)
+	transport, ok := pr.cache.Load(next.URL)
 	if !ok {
-		proxyURL, err := url.Parse("socks5://" + proxyAddr)
+		proxyURL, err := url.Parse(next.URL)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing proxy URL for %s: %v", proxyAddr, err)
+			return nil, fmt.Errorf("error parsing proxy URL for %s: %v", next.URL, err)
 		}
 
-		if pr.username != "" && pr.password != "" {
-			proxyURL.User = url.UserPassword(pr.username, pr.password)
+		if next.Username != "" && next.Password != "" {
+			proxyURL.User = url.UserPassword(next.Username, next.Password)
 		}
 
 		transport = &http.Transport{
 			Proxy: http.ProxyURL(proxyURL),
 		}
 
-		pr.cache.Store(proxyAddr, transport)
+		pr.cache.Store(next.URL, transport)
 	}
 
 	return transport.(*http.Transport).RoundTrip(req)

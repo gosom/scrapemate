@@ -160,8 +160,9 @@ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator
 
 			next := rotator.Next()
 
-			srv := "socks5://" + next
-			username, password := rotator.GetCredentials()
+			srv := next.URL
+			username := next.Username
+			password := next.Password
 
 			return &playwright.Proxy{
 				Server: srv,
