@@ -51,7 +51,6 @@ type ResultWriter interface {
 //
 //go:generate mockgen -destination=mock/mock_proxy_rotator.go -package=mock . ProxyRotator
 type ProxyRotator interface {
-	GetCredentials() (string, string)
 	RoundTrip(req *http.Request) (*http.Response, error)
-	Next() string
+	Next() Proxy
 }

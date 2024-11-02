@@ -154,7 +154,7 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 	)
 
 	if len(app.cfg.Proxies) > 0 {
-		rotator = proxy.New(app.cfg.Proxies, app.cfg.ProxyUsername, app.cfg.ProxyPassword)
+		rotator = proxy.New(app.cfg.Proxies)
 	}
 
 	const timeout = 10 * time.Second
