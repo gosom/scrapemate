@@ -140,6 +140,21 @@ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator
 		Args: []string{
 			`--start-maximized`,
 			`--no-default-browser-check`,
+			`--disable-dev-shm-usage`,
+			`--no-sandbox`,
+			`--disable-setuid-sandbox`,
+			`--no-zygote`,
+			`--disable-gpu`,
+			`--mute-audio`,
+			`--disable-extensions`,
+			`--single-process`,
+			`--disable-breakpad`,
+			`--disable-features=TranslateUI,BlinkGenPropertyTrees`,
+			`--disable-ipc-flooding-protection`,
+			`--enable-features=NetworkService,NetworkServiceInProcess`,
+			`--disable-default-apps`,
+			`--disable-notifications`,
+			`--disable-webgl`,
 		},
 	}
 	if disableImages {
