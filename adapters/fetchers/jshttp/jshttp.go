@@ -10,7 +10,13 @@ import (
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 
 func New(headless, disableImages bool, rotator scrapemate.ProxyRotator) (scrapemate.HTTPFetcher, error) {
-	if err := playwright.Install(); err != nil {
+	opts := []*playwright.RunOptions{
+		{
+			Browsers: []string{"chromium"},
+		},
+	}
+
+	if err := playwright.Install(opts...); err != nil {
 		return nil, err
 	}
 
