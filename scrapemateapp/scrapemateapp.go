@@ -14,6 +14,7 @@ import (
 	"github.com/gosom/scrapemate/adapters/cache/leveldbcache"
 	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
+	"github.com/gosom/scrapemate/adapters/fetchers/stealth"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
 	memprovider "github.com/gosom/scrapemate/adapters/providers/memory"
 	"github.com/gosom/scrapemate/adapters/proxy"
@@ -166,21 +167,25 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 			return nil, err
 		}
 	default:
-		cookieJar, err := cookiejar.New(nil)
-		if err != nil {
-			return nil, err
-		}
+		if app.cfg.UseStealth {
+			httpFetcher = stealth.New()
+		} else {
+			cookieJar, err := cookiejar.New(nil)
+			if err != nil {
+				return nil, err
+			}
 
-		netClient := &http.Client{
-			Timeout: timeout,
-			Jar:     cookieJar,
-		}
+			netClient := &http.Client{
+				Timeout: timeout,
+				Jar:     cookieJar,
+			}
 
-		if rotator != nil {
-			netClient.Transport = rotator
-		}
+			if rotator != nil {
+				netClient.Transport = rotator
+			}
 
-		httpFetcher = fetcher.New(netClient)
+			httpFetcher = fetcher.New(netClient)
+		}
 	}
 
 	return httpFetcher, nil

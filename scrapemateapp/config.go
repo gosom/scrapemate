@@ -60,6 +60,14 @@ func WithJS(opts ...func(*jsOptions)) func(*Config) error {
 	}
 }
 
+func WithStealth() func(*Config) error {
+	return func(o *Config) error {
+		o.UseStealth = true
+
+		return o.validate()
+	}
+}
+
 // WithProvider sets the provider of the app.
 func WithProvider(provider scrapemate.JobProvider) func(*Config) error {
 	return func(o *Config) error {
@@ -136,6 +144,9 @@ type Config struct {
 
 	// UseJS is whether to use JavaScript to render the page.
 	UseJS bool `validate:"omitempty"`
+	// UseStealth is whether to use stealth mode to scrape the page.
+	// uses a special http client to scrape the page.
+	UseStealth bool `validate:"omitempty"`
 	// JSOpts are the options for the JavaScript renderer.
 	JSOpts jsOptions
 
