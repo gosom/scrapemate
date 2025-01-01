@@ -12,10 +12,17 @@ import (
 )
 
 type stealthFetch struct {
+	browserSettings settings
 }
 
-func New() scrapemate.HTTPFetcher {
-	return &stealthFetch{}
+func New(browser ...string) scrapemate.HTTPFetcher {
+	ans := stealthFetch{}
+
+	if len(browser) > 0 {
+		ans.browserSettings = newSettings(browser[0])
+	}
+
+	return &ans
 }
 
 func (o *stealthFetch) Close() error {
@@ -36,7 +43,8 @@ func (o *stealthFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemat
 
 	defer session.Close()
 
-	session.Browser = azuretls.Firefox
+	session.Browser = o.browserSettings.browser
+	session.OrderedHeaders = o.browserSettings.headers
 
 	req := azuretls.Request{
 		Method: job.GetMethod(),
