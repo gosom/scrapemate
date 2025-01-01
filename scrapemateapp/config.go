@@ -60,9 +60,10 @@ func WithJS(opts ...func(*jsOptions)) func(*Config) error {
 	}
 }
 
-func WithStealth() func(*Config) error {
+func WithStealth(browser string) func(*Config) error {
 	return func(o *Config) error {
 		o.UseStealth = true
+		o.StealthBrowser = browser
 
 		return o.validate()
 	}
@@ -147,6 +148,8 @@ type Config struct {
 	// UseStealth is whether to use stealth mode to scrape the page.
 	// uses a special http client to scrape the page.
 	UseStealth bool `validate:"omitempty"`
+	// StealthBrowser is the browser to use for stealth mode.
+	StealthBrowser string `validate:"omitempty"`
 	// JSOpts are the options for the JavaScript renderer.
 	JSOpts jsOptions
 
