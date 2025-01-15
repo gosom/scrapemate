@@ -117,6 +117,11 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 				Error: err,
 			}
 		}
+
+		// match the browser default timeout to the job timeout
+		if job.GetTimeout() > 0 {
+			page.SetDefaultTimeout(float64(job.GetTimeout().Milliseconds()))
+		}
 	}
 
 	defer page.Close()
