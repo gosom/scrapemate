@@ -1,9 +1,10 @@
 # scrapemate
+[![Documentation](https://img.shields.io/badge/Documentation-Read%20Here-blue)](https://gosom.github.io/scrapemate)
 [![GoDoc](https://godoc.org/github.com/gosom/scrapemate?status.svg)](https://godoc.org/github.com/gosom/scrapemate)
 ![build](https://github.com/gosom/scrapemate/actions/workflows/build.yml/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gosom/scrapemate)](https://goreportcard.com/report/github.com/gosom/scrapemate)
 
-Scrapemate is a web crawling and scraping framework written in Golang. It is designed to be simple and easy to use, yet powerful enough to handle complex scraping tasks.
+[Scrapemate](https://gosom.github.io/scrapemate) is a web crawling and scraping framework written in Golang. It is designed to be simple and easy to use, yet powerful enough to handle complex scraping tasks.
 
 
 ## Features
@@ -20,6 +21,7 @@ Scrapemate is a web crawling and scraping framework written in Golang. It is des
 - Headless and Headful support when using JS rendering
 - Automatic cookie and session handling
 - Rotating HTTP/HTTPS/SOCKS5 proxy support
+
 
 ## Installation
 
@@ -127,6 +129,8 @@ go run main.go 1>countries.csv
 (hit CTRL-C to exit)
 
 ## Documentation
+
+You can find more documentation [here](https://gosom.github.io/scrapemate)
 
 For the High Level API see this [example](https://github.com/gosom/scrapemate/tree/main/examples/quotes-to-scrape-app).
 
