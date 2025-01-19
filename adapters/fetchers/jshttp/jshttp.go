@@ -9,7 +9,7 @@ import (
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 
-func New(headless, disableImages bool, rotator scrapemate.ProxyRotator) (scrapemate.HTTPFetcher, error) {
+func New(headless, disableImages bool, rotator scrapemate.ProxyRotator, poolSize, pageReuseLimit, browserReuseLimit int) (scrapemate.HTTPFetcher, error) {
 	opts := []*playwright.RunOptions{
 		{
 			Browsers: []string{"chromium"},
@@ -20,30 +20,42 @@ func New(headless, disableImages bool, rotator scrapemate.ProxyRotator) (scrapem
 		return nil, err
 	}
 
-	const poolSize = 10
-
 	pw, err := playwright.Run()
 	if err != nil {
 		return nil, err
 	}
 
 	ans := jsFetch{
-		pw:            pw,
-		headless:      headless,
-		disableImages: disableImages,
-		pool:          make(chan *browser, poolSize),
-		rotator:       rotator,
+		pw:                pw,
+		headless:          headless,
+		disableImages:     disableImages,
+		pool:              make(chan *browser, poolSize),
+		rotator:           rotator,
+		pageReuseLimit:    pageReuseLimit,
+		browserReuseLimit: browserReuseLimit,
+	}
+
+	for i := 0; i < poolSize; i++ {
+		b, err := newBrowser(pw, headless, disableImages, rotator)
+		if err != nil {
+			_ = ans.Close()
+			return nil, err
+		}
+
+		ans.pool <- b
 	}
 
 	return &ans, nil
 }
 
 type jsFetch struct {
-	pw            *playwright.Playwright
-	headless      bool
-	disableImages bool
-	pool          chan *browser
-	rotator       scrapemate.ProxyRotator
+	pw                *playwright.Playwright
+	headless          bool
+	disableImages     bool
+	pool              chan *browser
+	rotator           scrapemate.ProxyRotator
+	pageReuseLimit    int
+	browserReuseLimit int
 }
 
 func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
@@ -51,15 +63,15 @@ func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case ans := <-o.pool:
-		return ans, nil
-	default:
-		ans, err := newBrowser(o.pw, o.headless, o.disableImages, o.rotator)
-		if err != nil {
-			return nil, err
+		if ans.browser.IsConnected() && (o.browserReuseLimit <= 0 || ans.browserUsage < o.browserReuseLimit) {
+			return ans, nil
 		}
 
-		return ans, nil
+		ans.browser.Close()
+	default:
 	}
+
+	return newBrowser(o.pw, o.headless, o.disableImages, o.rotator)
 }
 
 func (o *jsFetch) Close() error {
@@ -75,6 +87,12 @@ func (o *jsFetch) Close() error {
 }
 
 func (o *jsFetch) PutBrowser(ctx context.Context, b *browser) {
+	if !b.browser.IsConnected() {
+		b.Close()
+
+		return
+	}
+
 	select {
 	case <-ctx.Done():
 		b.Close()
@@ -117,21 +135,32 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 				Error: err,
 			}
 		}
-
-		// match the browser default timeout to the job timeout
-		if job.GetTimeout() > 0 {
-			page.SetDefaultTimeout(float64(job.GetTimeout().Milliseconds()))
-		}
 	}
 
-	defer page.Close()
+	// match the browser default timeout to the job timeout
+	if job.GetTimeout() > 0 {
+		page.SetDefaultTimeout(float64(job.GetTimeout().Milliseconds()))
+	}
+
+	browser.page0Usage++
+	browser.browserUsage++
+
+	defer func() {
+		if o.pageReuseLimit == 0 || browser.page0Usage >= o.pageReuseLimit {
+			_ = page.Close()
+
+			browser.page0Usage = 0
+		}
+	}()
 
 	return job.BrowserActions(ctx, page)
 }
 
 type browser struct {
-	browser playwright.Browser
-	ctx     playwright.BrowserContext
+	browser      playwright.Browser
+	ctx          playwright.BrowserContext
+	page0Usage   int
+	browserUsage int
 }
 
 func (o *browser) Close() {

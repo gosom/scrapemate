@@ -162,7 +162,14 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 
 	switch app.cfg.UseJS {
 	case true:
-		httpFetcher, err = jsfetcher.New(!app.cfg.JSOpts.Headfull, app.cfg.JSOpts.DisableImages, rotator)
+		httpFetcher, err = jsfetcher.New(
+			!app.cfg.JSOpts.Headfull,
+			app.cfg.JSOpts.DisableImages,
+			rotator,
+			app.cfg.Concurrency,
+			app.cfg.PageReuseLimit,
+			app.cfg.BrowserReuseLimit,
+		)
 		if err != nil {
 			return nil, err
 		}

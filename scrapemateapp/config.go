@@ -28,6 +28,24 @@ func NewConfig(writers []scrapemate.ResultWriter, options ...func(*Config) error
 	return &cfg, nil
 }
 
+// WithBrowserReuseLimit sets the browser reuse limit of the app.
+func WithBrowserReuseLimit(limit int) func(*Config) error {
+	return func(o *Config) error {
+		o.BrowserReuseLimit = limit
+
+		return nil
+	}
+}
+
+// WithPageReuseLimit sets the page reuse limit of the app.
+func WithPageReuseLimit(limit int) func(*Config) error {
+	return func(o *Config) error {
+		o.PageReuseLimit = limit
+
+		return nil
+	}
+}
+
 // WithConcurrency sets the concurrency of the app.
 func WithConcurrency(concurrency int) func(*Config) error {
 	return func(o *Config) error {
@@ -167,6 +185,14 @@ type Config struct {
 	ExitOnInactivityDuration time.Duration
 	// Proxies are the proxies to use for the app.
 	Proxies []string
+	// BrowserReuseLimit is the limit of browser reuse.
+	// Only applicable when using JavaScript renderer.
+	// By default it is 0, which means the browser will be reused indefinitely.
+	BrowserReuseLimit int
+	// PageReuseLimit is the limit of page reuse.
+	// Only applicable when using JavaScript renderer.
+	// By default it is 0, which means the page will not be reused.
+	PageReuseLimit int
 }
 
 func (o *Config) validate() error {
