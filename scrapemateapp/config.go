@@ -126,9 +126,17 @@ func Headfull() func(*jsOptions) {
 	}
 }
 
+// DisableImages is a helper function to disable images in the browser.
 func DisableImages() func(*jsOptions) {
 	return func(o *jsOptions) {
 		o.DisableImages = true
+	}
+}
+
+// WithUA sets the user agent of the browser.
+func WithUA(ua string) func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.UA = ua
 	}
 }
 
@@ -146,6 +154,7 @@ type jsOptions struct {
 	// By default, the browser is run in headless mode.
 	Headfull      bool
 	DisableImages bool
+	UA            string
 }
 
 type Config struct {

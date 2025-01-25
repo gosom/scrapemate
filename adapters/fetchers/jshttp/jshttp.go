@@ -9,7 +9,17 @@ import (
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 
-func New(headless, disableImages bool, rotator scrapemate.ProxyRotator, poolSize, pageReuseLimit, browserReuseLimit int) (scrapemate.HTTPFetcher, error) {
+type JSFetcherOptions struct {
+	Headless          bool
+	DisableImages     bool
+	Rotator           scrapemate.ProxyRotator
+	PoolSize          int
+	PageReuseLimit    int
+	BrowserReuseLimit int
+	UserAgent         string
+}
+
+func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 	opts := []*playwright.RunOptions{
 		{
 			Browsers: []string{"chromium"},
@@ -27,16 +37,17 @@ func New(headless, disableImages bool, rotator scrapemate.ProxyRotator, poolSize
 
 	ans := jsFetch{
 		pw:                pw,
-		headless:          headless,
-		disableImages:     disableImages,
-		pool:              make(chan *browser, poolSize),
-		rotator:           rotator,
-		pageReuseLimit:    pageReuseLimit,
-		browserReuseLimit: browserReuseLimit,
+		headless:          params.Headless,
+		disableImages:     params.DisableImages,
+		pool:              make(chan *browser, params.PoolSize),
+		rotator:           params.Rotator,
+		pageReuseLimit:    params.PageReuseLimit,
+		browserReuseLimit: params.BrowserReuseLimit,
+		ua:                params.UserAgent,
 	}
 
-	for i := 0; i < poolSize; i++ {
-		b, err := newBrowser(pw, headless, disableImages, rotator)
+	for i := 0; i < params.PoolSize; i++ {
+		b, err := newBrowser(pw, params.Headless, params.DisableImages, params.Rotator, params.UserAgent)
 		if err != nil {
 			_ = ans.Close()
 			return nil, err
@@ -56,6 +67,7 @@ type jsFetch struct {
 	rotator           scrapemate.ProxyRotator
 	pageReuseLimit    int
 	browserReuseLimit int
+	ua                string
 }
 
 func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
@@ -71,7 +83,7 @@ func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	default:
 	}
 
-	return newBrowser(o.pw, o.headless, o.disableImages, o.rotator)
+	return newBrowser(o.pw, o.headless, o.disableImages, o.rotator, o.ua)
 }
 
 func (o *jsFetch) Close() error {
@@ -168,7 +180,7 @@ func (o *browser) Close() {
 	_ = o.browser.Close()
 }
 
-func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator scrapemate.ProxyRotator) (*browser, error) {
+func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator scrapemate.ProxyRotator, ua string) (*browser, error) {
 	opts := playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(headless),
 		Args: []string{
@@ -189,6 +201,7 @@ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator
 			`--disable-default-apps`,
 			`--disable-notifications`,
 			`--disable-webgl`,
+			`--disable-blink-features=AutomationControlled`,
 		},
 	}
 	if disableImages {
@@ -204,6 +217,15 @@ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator
 	const defaultWidth, defaultHeight = 1920, 1080
 
 	bctx, err := br.NewContext(playwright.BrowserNewContextOptions{
+		UserAgent: func() *string {
+			if ua == "" {
+				defaultUA := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+
+				return &defaultUA
+			}
+
+			return &ua
+		}(),
 		Viewport: &playwright.Size{
 			Width:  defaultWidth,
 			Height: defaultHeight,
