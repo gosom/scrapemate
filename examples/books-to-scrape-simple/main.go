@@ -87,12 +87,17 @@ func run() error {
 	var rotator scrapemate.ProxyRotator
 
 	if len(proxy) > 0 {
-		rotator = proxyrotator.New([]string{proxy}, proxyUser, proxyPass)
+		rotator = proxyrotator.New([]string{proxy})
 	}
 
 	switch useJS {
 	case true:
-		httpFetcher, err = jsfetcher.New(true, false, rotator)
+		jsFetcherOpts := jsfetcher.JSFetcherOptions{
+			Headless:      false,
+			DisableImages: false,
+			Rotator:       rotator,
+		}
+		httpFetcher, err = jsfetcher.New(jsFetcherOpts)
 		if err != nil {
 			return err
 		}

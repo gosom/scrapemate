@@ -23,6 +23,7 @@ func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 	opts := []*playwright.RunOptions{
 		{
 			Browsers: []string{"chromium"},
+			Verbose:  true,
 		},
 	}
 
@@ -182,6 +183,7 @@ func (o *browser) Close() {
 
 func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator scrapemate.ProxyRotator, ua string) (*browser, error) {
 	opts := playwright.BrowserTypeLaunchOptions{
+		Channel:  playwright.String("chrome"),
 		Headless: playwright.Bool(headless),
 		Args: []string{
 			`--start-maximized`,
@@ -198,10 +200,14 @@ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator
 			`--disable-features=TranslateUI,BlinkGenPropertyTrees`,
 			`--disable-ipc-flooding-protection`,
 			`--enable-features=NetworkService,NetworkServiceInProcess`,
+			"--enable-features=NetworkService",
 			`--disable-default-apps`,
 			`--disable-notifications`,
 			`--disable-webgl`,
 			`--disable-blink-features=AutomationControlled`,
+			"--ignore-certificate-errors",
+			"--ignore-certificate-errors-spki-list",
+			"--disable-web-security",
 		},
 	}
 	if disableImages {
@@ -242,19 +248,9 @@ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator
 			password := next.Password
 
 			return &playwright.Proxy{
-				Server: srv,
-				Username: func() *string {
-					if username == "" {
-						return nil
-					}
-					return &username
-				}(),
-				Password: func() *string {
-					if password == "" {
-						return nil
-					}
-					return &password
-				}(),
+				Server:   srv,
+				Username: playwright.String(username),
+				Password: playwright.String(password),
 			}
 		}(),
 	})
