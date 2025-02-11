@@ -183,7 +183,6 @@ func (o *browser) Close() {
 
 func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator scrapemate.ProxyRotator, ua string) (*browser, error) {
 	opts := playwright.BrowserTypeLaunchOptions{
-		Channel:  playwright.String("chrome"),
 		Headless: playwright.Bool(headless),
 		Args: []string{
 			`--start-maximized`,
