@@ -178,7 +178,10 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 		}
 	default:
 		if app.cfg.UseStealth {
-			httpFetcher = stealth.New(app.cfg.StealthBrowser)
+			httpFetcher = stealth.New(
+				app.cfg.StealthBrowser,
+				rotator,
+			)
 		} else {
 			cookieJar, err := cookiejar.New(nil)
 			if err != nil {
