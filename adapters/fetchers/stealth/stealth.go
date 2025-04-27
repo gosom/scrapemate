@@ -11,15 +11,24 @@ import (
 	"github.com/Noooste/azuretls-client"
 )
 
-type stealthFetch struct {
-	browserSettings settings
+type proxyFetcher interface {
+	Next() scrapemate.Proxy
 }
 
-func New(browser ...string) scrapemate.HTTPFetcher {
+type stealthFetch struct {
+	browserSettings settings
+	rotator         proxyFetcher
+}
+
+func New(browser string, rotator proxyFetcher) scrapemate.HTTPFetcher {
 	ans := stealthFetch{}
 
-	if len(browser) > 0 {
-		ans.browserSettings = newSettings(browser[0])
+	if browser != "" {
+		ans.browserSettings = newSettings(browser)
+	}
+
+	if rotator != nil {
+		ans.rotator = rotator
 	}
 
 	return &ans
@@ -40,16 +49,26 @@ func (o *stealthFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemat
 	}
 
 	session := azuretls.NewSessionWithContext(ctx)
-
 	defer session.Close()
+
+	if o.rotator != nil {
+		proxy := o.rotator.Next()
+		if err := session.SetProxy(proxy.URL); err != nil {
+			return scrapemate.Response{
+				Error: err,
+			}
+		}
+	}
 
 	session.Browser = o.browserSettings.browser
 	session.OrderedHeaders = o.browserSettings.headers
 
 	req := azuretls.Request{
-		Method: job.GetMethod(),
-		Url:    u,
+		Method:  job.GetMethod(),
+		Url:     u,
+		TimeOut: job.GetTimeout(),
 	}
+
 	req.SetContext(ctx)
 
 	var ans scrapemate.Response

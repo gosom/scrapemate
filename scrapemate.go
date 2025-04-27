@@ -547,14 +547,12 @@ func (s *ScrapeMate) startWorker(ctx context.Context) {
 				s.log.Error("error while processing job", "error", err)
 
 				s.pushToFailedJobs(job)
+			} else {
+				if err := s.finishJob(ctx, job, ans, next); err != nil {
+					s.log.Error("error while finishing job", "error", err)
 
-				continue
-			}
-
-			if err := s.finishJob(ctx, job, ans, next); err != nil {
-				s.log.Error("error while finishing job", "error", err)
-
-				s.pushToFailedJobs(job)
+					s.pushToFailedJobs(job)
+				}
 			}
 		}
 	}
@@ -564,7 +562,16 @@ func (s *ScrapeMate) pushToFailedJobs(job IJob) {
 	s.stats.incJobsFailed()
 
 	if s.failedJobs != nil {
-		s.failedJobs <- job
+		const defaultTimeout = 5 * time.Second
+
+		pushCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+		defer cancel()
+
+		select {
+		case <-pushCtx.Done():
+			return
+		case s.failedJobs <- job:
+		}
 	}
 }
 
