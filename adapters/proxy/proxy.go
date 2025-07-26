@@ -65,5 +65,10 @@ func (pr *Rotator) RoundTrip(req *http.Request) (*http.Response, error) {
 		pr.cache.Store(next.URL, transport)
 	}
 
-	return transport.(*http.Transport).RoundTrip(req)
+	tr, ok := transport.(*http.Transport)
+	if !ok {
+		return nil, fmt.Errorf("error casting transport for proxy %s", next.URL)
+	}
+
+	return tr.RoundTrip(req)
 }
