@@ -142,7 +142,7 @@ func TestRotatorConcurrency(t *testing.T) {
 
 		var mu sync.Mutex
 
-		for i := 0; i < iterations; i++ {
+		for range iterations {
 			wg.Add(1)
 
 			go func() {

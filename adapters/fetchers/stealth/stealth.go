@@ -52,8 +52,11 @@ func (o *stealthFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemat
 	defer session.Close()
 
 	if o.rotator != nil {
+		session.InsecureSkipVerify = true
+
 		proxy := o.rotator.Next()
-		if err := session.SetProxy(proxy.URL); err != nil {
+
+		if err := session.SetProxy(proxy.FullURL()); err != nil {
 			return scrapemate.Response{
 				Error: err,
 			}

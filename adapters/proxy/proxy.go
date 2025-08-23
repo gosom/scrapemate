@@ -38,10 +38,25 @@ func New(proxies []string) *Rotator {
 	}
 }
 
+func (pr *Rotator) Proxies() []string {
+	if pr == nil {
+		return nil
+	}
+
+	ans := make([]string, len(pr.proxies))
+	for i := range pr.proxies {
+		ans[i] = pr.proxies[i].FullURL()
+	}
+
+	return ans
+}
+
 func (pr *Rotator) Next() scrapemate.Proxy {
 	current := atomic.AddUint32(&pr.current, 1) - 1
 
-	return pr.proxies[current%uint32(len(pr.proxies))] //nolint:gosec // no overflow here
+	p := pr.proxies[current%uint32(len(pr.proxies))] //nolint:gosec // no overflow here
+
+	return p
 }
 
 func (pr *Rotator) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -57,6 +72,8 @@ func (pr *Rotator) RoundTrip(req *http.Request) (*http.Response, error) {
 		if next.Username != "" && next.Password != "" {
 			proxyURL.User = url.UserPassword(next.Username, next.Password)
 		}
+
+		fmt.Printf("using proxy: %s\n", proxyURL.String())
 
 		transport = &http.Transport{
 			Proxy: http.ProxyURL(proxyURL),
