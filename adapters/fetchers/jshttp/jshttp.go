@@ -3,8 +3,9 @@ package jshttp
 import (
 	"context"
 
-	"github.com/gosom/scrapemate"
 	"github.com/playwright-community/playwright-go"
+
+	"github.com/gosom/scrapemate"
 )
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
@@ -36,6 +37,19 @@ func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 		return nil, err
 	}
 
+	var pool *ProxyPool
+
+	if params.Rotator != nil {
+		proxies := params.Rotator.Proxies()
+
+		if len(proxies) > 0 {
+			pool, err = NewProxyPool(proxies)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	ans := jsFetch{
 		pw:                pw,
 		headless:          params.Headless,
@@ -45,10 +59,11 @@ func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 		pageReuseLimit:    params.PageReuseLimit,
 		browserReuseLimit: params.BrowserReuseLimit,
 		ua:                params.UserAgent,
+		proxyPool:         pool,
 	}
 
-	for i := 0; i < params.PoolSize; i++ {
-		b, err := newBrowser(pw, params.Headless, params.DisableImages, params.Rotator, params.UserAgent)
+	for range params.PoolSize {
+		b, err := newBrowser(pw, params.Headless, params.DisableImages, ans.proxyPool, params.UserAgent)
 		if err != nil {
 			_ = ans.Close()
 			return nil, err
@@ -69,6 +84,7 @@ type jsFetch struct {
 	pageReuseLimit    int
 	browserReuseLimit int
 	ua                string
+	proxyPool         *ProxyPool
 }
 
 func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
@@ -84,7 +100,7 @@ func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
 	default:
 	}
 
-	return newBrowser(o.pw, o.headless, o.disableImages, o.rotator, o.ua)
+	return newBrowser(o.pw, o.headless, o.disableImages, o.proxyPool, o.ua)
 }
 
 func (o *jsFetch) Close() error {
@@ -181,7 +197,7 @@ func (o *browser) Close() {
 	_ = o.browser.Close()
 }
 
-func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator scrapemate.ProxyRotator, ua string) (*browser, error) {
+func newBrowser(pw *playwright.Playwright, headless, disableImages bool, proxyPool *ProxyPool, ua string) (*browser, error) {
 	opts := playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(headless),
 		Args: []string{
@@ -214,7 +230,6 @@ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator
 	}
 
 	br, err := pw.Chromium.Launch(opts)
-
 	if err != nil {
 		return nil, err
 	}
@@ -236,21 +251,17 @@ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, rotator
 			Height: defaultHeight,
 		},
 		Proxy: func() *playwright.Proxy {
-			if rotator == nil {
-				return nil
+			if proxyPool != nil {
+				authProxy := proxyPool.Next()
+
+				addr := authProxy.Address()
+
+				return &playwright.Proxy{
+					Server: addr,
+				}
 			}
 
-			next := rotator.Next()
-
-			srv := next.URL
-			username := next.Username
-			password := next.Password
-
-			return &playwright.Proxy{
-				Server:   srv,
-				Username: playwright.String(username),
-				Password: playwright.String(password),
-			}
+			return nil
 		}(),
 	})
 	if err != nil {

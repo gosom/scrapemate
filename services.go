@@ -53,4 +53,5 @@ type ResultWriter interface {
 type ProxyRotator interface {
 	RoundTrip(req *http.Request) (*http.Response, error)
 	Next() Proxy
+	Proxies() []string
 }

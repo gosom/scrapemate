@@ -3,6 +3,7 @@ package scrapemate
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -11,6 +12,21 @@ type Proxy struct {
 	URL      string
 	Username string
 	Password string
+}
+
+func (o *Proxy) FullURL() string {
+	if o.Username != "" && o.Password != "" {
+		pu, err := url.Parse(o.URL)
+		if err != nil {
+			return o.URL
+		}
+
+		pu.User = url.UserPassword(o.Username, o.Password)
+
+		return pu.String()
+	}
+
+	return o.URL
 }
 
 func NewProxy(u string) (Proxy, error) {
@@ -23,19 +39,9 @@ func NewProxy(u string) (Proxy, error) {
 		return Proxy{}, err
 	}
 
-	supportedSchemes := []string{"socks5", "http", "https"}
-
+	supportedSchemes := []string{"socks5", "http", "https", "socks5h"}
 	scheme := strings.ToLower(pu.Scheme)
-
-	var valid bool
-
-	for _, s := range supportedSchemes {
-		if s == scheme {
-			valid = true
-
-			break
-		}
-	}
+	valid := slices.Contains(supportedSchemes, scheme)
 
 	if !valid {
 		return Proxy{}, fmt.Errorf("invalid proxy type: %s", scheme)
