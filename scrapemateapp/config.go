@@ -8,6 +8,16 @@ import (
 	"github.com/gosom/scrapemate"
 )
 
+// BrowserEngine represents the browser automation engine to use.
+type BrowserEngine string
+
+const (
+	// BrowserEnginePlaywright uses Playwright for browser automation.
+	BrowserEnginePlaywright BrowserEngine = "playwright"
+	// BrowserEngineRod uses go-rod for browser automation.
+	BrowserEngineRod BrowserEngine = "rod"
+)
+
 // NewConfig creates a new config with default values.
 func NewConfig(writers []scrapemate.ResultWriter, options ...func(*Config) error) (*Config, error) {
 	cfg := Config{
@@ -140,6 +150,22 @@ func WithUA(ua string) func(*jsOptions) {
 	}
 }
 
+// WithBrowserEngine sets the browser engine to use.
+// Defaults to Playwright if not set.
+func WithBrowserEngine(engine BrowserEngine) func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.BrowserEngine = engine
+	}
+}
+
+// WithRodStealth enables stealth mode for go-rod to avoid bot detection.
+// Only applicable when using BrowserEngineRod.
+func WithRodStealth() func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.RodStealth = true
+	}
+}
+
 // WithExitOnInactivity sets the duration after which the app will exit if there are no more jobs to run.
 func WithExitOnInactivity(duration time.Duration) func(*Config) error {
 	return func(o *Config) error {
@@ -152,9 +178,17 @@ func WithExitOnInactivity(duration time.Duration) func(*Config) error {
 type jsOptions struct {
 	// Headfull is a flag to run the browser in headfull mode.
 	// By default, the browser is run in headless mode.
-	Headfull      bool
+	Headfull bool
+	// DisableImages disables image loading in the browser.
 	DisableImages bool
-	UA            string
+	// UA is the user agent to use.
+	UA string
+	// BrowserEngine is the browser engine to use (playwright or rod).
+	// Defaults to playwright if not set.
+	BrowserEngine BrowserEngine
+	// RodStealth enables stealth mode for go-rod to avoid bot detection.
+	// Only applicable when using BrowserEngineRod.
+	RodStealth bool
 }
 
 type Config struct {

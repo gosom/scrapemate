@@ -14,6 +14,7 @@ import (
 	"github.com/gosom/scrapemate/adapters/cache/leveldbcache"
 	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
+	rodfetcher "github.com/gosom/scrapemate/adapters/fetchers/rodhttp"
 	"github.com/gosom/scrapemate/adapters/fetchers/stealth"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
 	memprovider "github.com/gosom/scrapemate/adapters/providers/memory"
@@ -162,17 +163,7 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 
 	switch app.cfg.UseJS {
 	case true:
-		jsParams := jsfetcher.JSFetcherOptions{
-			Headless:          !app.cfg.JSOpts.Headfull,
-			DisableImages:     app.cfg.JSOpts.DisableImages,
-			Rotator:           rotator,
-			PoolSize:          app.cfg.Concurrency,
-			PageReuseLimit:    app.cfg.PageReuseLimit,
-			BrowserReuseLimit: app.cfg.BrowserReuseLimit,
-			UserAgent:         app.cfg.JSOpts.UA,
-		}
-
-		httpFetcher, err = jsfetcher.New(jsParams)
+		httpFetcher, err = app.getJSFetcher(rotator)
 		if err != nil {
 			return nil, err
 		}
@@ -202,6 +193,43 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 	}
 
 	return httpFetcher, nil
+}
+
+func (app *ScrapemateApp) getJSFetcher(rotator scrapemate.ProxyRotator) (scrapemate.HTTPFetcher, error) {
+	switch app.cfg.JSOpts.BrowserEngine {
+	case BrowserEngineRod:
+		return rodfetcher.New(rodfetcher.RodFetcherOptions{
+			Headless:          !app.cfg.JSOpts.Headfull,
+			DisableImages:     app.cfg.JSOpts.DisableImages,
+			Rotator:           rotator,
+			PoolSize:          app.cfg.Concurrency,
+			PageReuseLimit:    app.cfg.PageReuseLimit,
+			BrowserReuseLimit: app.cfg.BrowserReuseLimit,
+			UserAgent:         app.cfg.JSOpts.UA,
+			Stealth:           app.cfg.JSOpts.RodStealth,
+		})
+	case BrowserEnginePlaywright:
+		return jsfetcher.New(jsfetcher.JSFetcherOptions{
+			Headless:          !app.cfg.JSOpts.Headfull,
+			DisableImages:     app.cfg.JSOpts.DisableImages,
+			Rotator:           rotator,
+			PoolSize:          app.cfg.Concurrency,
+			PageReuseLimit:    app.cfg.PageReuseLimit,
+			BrowserReuseLimit: app.cfg.BrowserReuseLimit,
+			UserAgent:         app.cfg.JSOpts.UA,
+		})
+	default:
+		// Default to Playwright when BrowserEngine is empty or unknown
+		return jsfetcher.New(jsfetcher.JSFetcherOptions{
+			Headless:          !app.cfg.JSOpts.Headfull,
+			DisableImages:     app.cfg.JSOpts.DisableImages,
+			Rotator:           rotator,
+			PoolSize:          app.cfg.Concurrency,
+			PageReuseLimit:    app.cfg.PageReuseLimit,
+			BrowserReuseLimit: app.cfg.BrowserReuseLimit,
+			UserAgent:         app.cfg.JSOpts.UA,
+		})
+	}
 }
 
 //nolint:unparam // this function returns always nil error
