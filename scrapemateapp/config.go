@@ -140,6 +140,22 @@ func WithUA(ua string) func(*jsOptions) {
 	}
 }
 
+// WithBrowserEngine is deprecated - use build tags instead.
+// Build with -tags rod to use go-rod, or without for Playwright.
+func WithBrowserEngine(_ string) func(*jsOptions) {
+	return func(_ *jsOptions) {
+		// No-op: browser engine is now selected at compile time via build tags
+	}
+}
+
+// WithRodStealth enables stealth mode for go-rod to avoid bot detection.
+// Only applicable when using BrowserEngineRod.
+func WithRodStealth() func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.RodStealth = true
+	}
+}
+
 // WithExitOnInactivity sets the duration after which the app will exit if there are no more jobs to run.
 func WithExitOnInactivity(duration time.Duration) func(*Config) error {
 	return func(o *Config) error {
@@ -152,9 +168,14 @@ func WithExitOnInactivity(duration time.Duration) func(*Config) error {
 type jsOptions struct {
 	// Headfull is a flag to run the browser in headfull mode.
 	// By default, the browser is run in headless mode.
-	Headfull      bool
+	Headfull bool
+	// DisableImages disables image loading in the browser.
 	DisableImages bool
-	UA            string
+	// UA is the user agent to use.
+	UA string
+	// RodStealth enables stealth mode for go-rod to avoid bot detection.
+	// Only applicable when building with -tags rod.
+	RodStealth bool
 }
 
 type Config struct {

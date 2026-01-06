@@ -12,7 +12,6 @@ import (
 
 	"github.com/gosom/scrapemate/adapters/cache/filecache"
 	"github.com/gosom/scrapemate/adapters/cache/leveldbcache"
-	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
 	"github.com/gosom/scrapemate/adapters/fetchers/stealth"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
@@ -162,17 +161,7 @@ func (app *ScrapemateApp) getFetcher() (scrapemate.HTTPFetcher, error) {
 
 	switch app.cfg.UseJS {
 	case true:
-		jsParams := jsfetcher.JSFetcherOptions{
-			Headless:          !app.cfg.JSOpts.Headfull,
-			DisableImages:     app.cfg.JSOpts.DisableImages,
-			Rotator:           rotator,
-			PoolSize:          app.cfg.Concurrency,
-			PageReuseLimit:    app.cfg.PageReuseLimit,
-			BrowserReuseLimit: app.cfg.BrowserReuseLimit,
-			UserAgent:         app.cfg.JSOpts.UA,
-		}
-
-		httpFetcher, err = jsfetcher.New(jsParams)
+		httpFetcher, err = app.getJSFetcher(rotator)
 		if err != nil {
 			return nil, err
 		}

@@ -15,7 +15,6 @@ import (
 	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/adapters/cache/filecache"
 	"github.com/gosom/scrapemate/adapters/cache/leveldbcache"
-	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
 	provider "github.com/gosom/scrapemate/adapters/providers/memory"
@@ -41,6 +40,7 @@ func run() error {
 
 	var (
 		useJS       bool
+		useStealth  bool
 		cacheType   string
 		concurrency int
 		proxy       string
@@ -48,7 +48,8 @@ func run() error {
 		proxyPass   string
 	)
 
-	flag.BoolVar(&useJS, "js", false, "use javascript")
+	flag.BoolVar(&useJS, "js", false, "use javascript rendering")
+	flag.BoolVar(&useStealth, "stealth", false, "enable stealth mode (only with rod build tag)")
 	flag.StringVar(&cacheType, "cache", "", "use cache of type: file,leveldb DEFAULT: no cache")
 	flag.IntVar(&concurrency, "concurrency", 10, "concurrency")
 	flag.StringVar(&proxy, "proxy", "", "proxy to use")
@@ -90,18 +91,12 @@ func run() error {
 		rotator = proxyrotator.New([]string{proxy})
 	}
 
-	switch useJS {
-	case true:
-		jsFetcherOpts := jsfetcher.JSFetcherOptions{
-			Headless:      false,
-			DisableImages: false,
-			Rotator:       rotator,
-		}
-		httpFetcher, err = jsfetcher.New(jsFetcherOpts)
+	if useJS {
+		httpFetcher, err = newJSFetcher(concurrency, rotator, useStealth)
 		if err != nil {
 			return err
 		}
-	default:
+	} else {
 		var netClient *http.Client
 
 		if rotator != nil {

@@ -1,3 +1,5 @@
+//go:build !rod
+
 package jshttp
 
 import (
@@ -6,6 +8,7 @@ import (
 	"github.com/playwright-community/playwright-go"
 
 	"github.com/gosom/scrapemate"
+	playwrightadapter "github.com/gosom/scrapemate/adapters/browsers/playwright"
 )
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
@@ -182,7 +185,9 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 		}
 	}()
 
-	return job.BrowserActions(ctx, page)
+	wrappedPage := playwrightadapter.NewPage(page)
+
+	return job.BrowserActions(ctx, wrappedPage)
 }
 
 type browser struct {

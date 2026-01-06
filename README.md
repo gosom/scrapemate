@@ -22,6 +22,67 @@
 - Automatic cookie and session handling
 - Rotating HTTP/HTTPS/SOCKS5 proxy support
 
+## Browser Engines
+
+Scrapemate supports two browser engines for JavaScript rendering: **Playwright** (default) and **Rod**. The browser engine is selected at compile time using Go build tags.
+
+### Playwright (Default)
+
+Playwright is used by default when no build tags are specified. It requires the Playwright browsers to be installed.
+
+```bash
+# Install playwright browsers
+go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
+```
+
+Build and run without any special tags:
+
+```bash
+go build ./...
+```
+
+### Rod
+
+Rod is a pure Go solution that uses the Chrome DevTools Protocol directly. To use Rod instead of Playwright, compile with the `rod` build tag.
+
+```bash
+# Build with Rod support
+go build -tags rod ./...
+
+# Run with Rod support
+go run -tags rod ./...
+```
+
+Rod will automatically download and manage Chrome/Chromium if it's not already available on your system.
+
+### Choosing Between Playwright and Rod
+
+| Feature | Playwright | Rod |
+|---------|-----------|-----|
+| **Dependencies** | Requires browser installation step | Auto-downloads browser |
+| **Browser Support** | Chromium, Firefox, WebKit | Chromium only |
+| **Performance** | Slightly higher overhead | Lower overhead, pure Go |
+| **Docker** | Larger image size | Smaller image size |
+| **API Stability** | Very stable | Stable |
+
+**Recommendation**: Use Playwright if you need multi-browser support or are already familiar with Playwright. Use Rod if you prefer a pure Go solution with automatic browser management and smaller Docker images.
+
+### Example Usage
+
+The [books-to-scrape-simple](https://github.com/gosom/scrapemate/tree/main/examples/books-to-scrape-simple) example demonstrates how to use both browser engines:
+
+```bash
+# Run with Playwright (default)
+# First install browsers: go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
+go run . -js
+
+# Run with Rod
+go run -tags rod . -js
+
+# Run with Rod in stealth mode
+go run -tags rod . -js -stealth
+```
+
 
 ## Installation
 
@@ -127,6 +188,49 @@ go run main.go 1>countries.csv
 ```
 
 (hit CTRL-C to exit)
+
+## Migrating from v0.9.x to v1.0.0
+
+Version 1.0.0 introduces a `BrowserPage` interface abstraction to support multiple browser engines. This is a breaking change for users who use JavaScript rendering with `BrowserActions`.
+
+### Update `BrowserActions` signature
+
+```go
+// Before (v0.9.x)
+func (j *MyJob) BrowserActions(ctx context.Context, page playwright.Page) scrapemate.Response {
+    page.Goto("https://example.com", playwright.PageGotoOptions{
+        WaitUntil: playwright.WaitUntilStateNetworkidle,
+    })
+    html, _ := page.Content()
+    return scrapemate.Response{Body: []byte(html)}
+}
+
+// After (v1.0.0)
+func (j *MyJob) BrowserActions(ctx context.Context, page scrapemate.BrowserPage) scrapemate.Response {
+    resp, err := page.Goto("https://example.com", scrapemate.WaitUntilNetworkIdle)
+    if err != nil {
+        return scrapemate.Response{Error: err}
+    }
+    return scrapemate.Response{
+        Body:       resp.Body,
+        StatusCode: resp.StatusCode,
+    }
+}
+```
+
+### Accessing the underlying browser page
+
+If you need browser-specific features, use `Unwrap()`:
+
+```go
+// For Playwright
+pwPage := page.Unwrap().(playwright.Page)
+
+// For Rod (when compiled with -tags rod)
+rodPage := page.Unwrap().(*rod.Page)
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list of changes.
 
 ## Documentation
 

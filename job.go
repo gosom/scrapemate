@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"sort"
 	"time"
-
-	"github.com/playwright-community/playwright-go"
 )
 
 var _ IJob = (*Job)(nil)
@@ -49,7 +47,7 @@ type IJob interface {
 	Process(ctx context.Context, resp *Response) (any, []IJob, error)
 	// GetMaxRetryDelay returns the delay to wait before retrying
 	GetMaxRetryDelay() time.Duration
-	BrowserActions(ctx context.Context, page playwright.Page) Response
+	BrowserActions(ctx context.Context, page BrowserPage) Response
 	// DoScreenshot takes a screenshot of the page
 	// Only works if the scraper uses jsfetcher
 	DoScreenshot() bool
@@ -141,38 +139,22 @@ func (j *Job) DoScreenshot() bool {
 // This is the function that will be executed in the browser
 // this is a default implementation that will just return the response
 // override this function to perform actions in the browser
-func (j *Job) BrowserActions(_ context.Context, page playwright.Page) Response {
+func (j *Job) BrowserActions(_ context.Context, page BrowserPage) Response {
 	var resp Response
 
-	pageResponse, err := page.Goto(j.GetFullURL(), playwright.PageGotoOptions{
-		WaitUntil: playwright.WaitUntilStateNetworkidle,
-	})
+	pageResponse, err := page.Goto(j.GetFullURL(), WaitUntilNetworkIdle)
 	if err != nil {
 		resp.Error = err
 		return resp
 	}
 
-	resp.URL = pageResponse.URL()
-	resp.StatusCode = pageResponse.Status()
-	resp.Headers = make(http.Header, len(pageResponse.Headers()))
-
-	for k, v := range pageResponse.Headers() {
-		resp.Headers.Add(k, v)
-	}
-
-	body, err := pageResponse.Body()
-	if err != nil {
-		resp.Error = err
-
-		return resp
-	}
-
-	resp.Body = body
+	resp.URL = pageResponse.URL
+	resp.StatusCode = pageResponse.StatusCode
+	resp.Headers = pageResponse.Headers
+	resp.Body = pageResponse.Body
 
 	if j.DoScreenshot() {
-		screenshot, err := page.Screenshot(playwright.PageScreenshotOptions{
-			FullPage: playwright.Bool(true),
-		})
+		screenshot, err := page.Screenshot(true)
 		if err != nil {
 			resp.Error = err
 			return resp
