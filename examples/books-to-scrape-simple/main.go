@@ -15,9 +15,7 @@ import (
 	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/adapters/cache/filecache"
 	"github.com/gosom/scrapemate/adapters/cache/leveldbcache"
-	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 	fetcher "github.com/gosom/scrapemate/adapters/fetchers/nethttp"
-	rodfetcher "github.com/gosom/scrapemate/adapters/fetchers/rodhttp"
 	parser "github.com/gosom/scrapemate/adapters/parsers/goqueryparser"
 	provider "github.com/gosom/scrapemate/adapters/providers/memory"
 	proxyrotator "github.com/gosom/scrapemate/adapters/proxy"
@@ -42,7 +40,6 @@ func run() error {
 
 	var (
 		useJS       bool
-		useGoRod    bool
 		useStealth  bool
 		cacheType   string
 		concurrency int
@@ -51,9 +48,8 @@ func run() error {
 		proxyPass   string
 	)
 
-	flag.BoolVar(&useJS, "js", false, "use javascript with playwright")
-	flag.BoolVar(&useGoRod, "gorod", false, "use javascript with go-rod")
-	flag.BoolVar(&useStealth, "stealth", false, "enable stealth mode (only with -gorod)")
+	flag.BoolVar(&useJS, "js", false, "use javascript rendering")
+	flag.BoolVar(&useStealth, "stealth", false, "enable stealth mode (only with rod build tag)")
 	flag.StringVar(&cacheType, "cache", "", "use cache of type: file,leveldb DEFAULT: no cache")
 	flag.IntVar(&concurrency, "concurrency", 10, "concurrency")
 	flag.StringVar(&proxy, "proxy", "", "proxy to use")
@@ -95,31 +91,12 @@ func run() error {
 		rotator = proxyrotator.New([]string{proxy})
 	}
 
-	switch {
-	case useGoRod:
-		rodFetcherOpts := rodfetcher.RodFetcherOptions{
-			Headless:      false,
-			DisableImages: false,
-			Rotator:       rotator,
-			PoolSize:      concurrency,
-			Stealth:       useStealth,
-		}
-		httpFetcher, err = rodfetcher.New(rodFetcherOpts)
+	if useJS {
+		httpFetcher, err = newJSFetcher(concurrency, rotator, useStealth)
 		if err != nil {
 			return err
 		}
-	case useJS:
-		jsFetcherOpts := jsfetcher.JSFetcherOptions{
-			Headless:      false,
-			DisableImages: false,
-			Rotator:       rotator,
-			PoolSize:      concurrency,
-		}
-		httpFetcher, err = jsfetcher.New(jsFetcherOpts)
-		if err != nil {
-			return err
-		}
-	default:
+	} else {
 		var netClient *http.Client
 
 		if rotator != nil {

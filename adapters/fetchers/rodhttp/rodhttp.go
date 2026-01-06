@@ -1,3 +1,5 @@
+//go:build rod
+
 package rodhttp
 
 import (
@@ -202,31 +204,21 @@ func (o *rodFetch) newBrowser() (*browser, error) {
 		Set("disable-dev-shm-usage").
 		Set("disable-gpu").
 		Set("no-first-run").
-		Set("no-zygote").
-		Set("single-process").
 		Set("disable-extensions").
-		Set("disable-default-apps").
 		Set("mute-audio").
 		Set("disable-background-networking").
+		Set("disable-sync").
+		Set("disable-blink-features", "AutomationControlled").
+		Set("ignore-certificate-errors").
+		// Flags for containerized/restricted environments
+		Set("no-zygote").
+		Set("single-process").
+		// Flags for reliable scraping timing
 		Set("disable-background-timer-throttling").
 		Set("disable-backgrounding-occluded-windows").
-		Set("disable-breakpad").
-		Set("disable-component-update").
-		Set("disable-domain-reliability").
-		Set("disable-features", "TranslateUI,BlinkGenPropertyTrees,AudioServiceOutOfProcess").
-		Set("disable-hang-monitor").
-		Set("disable-ipc-flooding-protection").
-		Set("disable-popup-blocking").
-		Set("disable-prompt-on-repost").
 		Set("disable-renderer-backgrounding").
-		Set("disable-sync").
-		Set("force-color-profile", "srgb").
-		Set("metrics-recording-only").
-		Set("safebrowsing-disable-auto-update").
-		Set("password-store", "basic").
-		Set("use-mock-keychain").
-		Set("disable-blink-features", "AutomationControlled").
-		Set("ignore-certificate-errors")
+		// Allow popups for scraping flows
+		Set("disable-popup-blocking")
 
 	if o.disableImages {
 		l = l.Set("blink-settings", "imagesEnabled=false")

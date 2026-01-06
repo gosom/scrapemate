@@ -8,16 +8,6 @@ import (
 	"github.com/gosom/scrapemate"
 )
 
-// BrowserEngine represents the browser automation engine to use.
-type BrowserEngine string
-
-const (
-	// BrowserEnginePlaywright uses Playwright for browser automation.
-	BrowserEnginePlaywright BrowserEngine = "playwright"
-	// BrowserEngineRod uses go-rod for browser automation.
-	BrowserEngineRod BrowserEngine = "rod"
-)
-
 // NewConfig creates a new config with default values.
 func NewConfig(writers []scrapemate.ResultWriter, options ...func(*Config) error) (*Config, error) {
 	cfg := Config{
@@ -150,11 +140,11 @@ func WithUA(ua string) func(*jsOptions) {
 	}
 }
 
-// WithBrowserEngine sets the browser engine to use.
-// Defaults to Playwright if not set.
-func WithBrowserEngine(engine BrowserEngine) func(*jsOptions) {
-	return func(o *jsOptions) {
-		o.BrowserEngine = engine
+// WithBrowserEngine is deprecated - use build tags instead.
+// Build with -tags rod to use go-rod, or without for Playwright.
+func WithBrowserEngine(_ string) func(*jsOptions) {
+	return func(_ *jsOptions) {
+		// No-op: browser engine is now selected at compile time via build tags
 	}
 }
 
@@ -183,11 +173,8 @@ type jsOptions struct {
 	DisableImages bool
 	// UA is the user agent to use.
 	UA string
-	// BrowserEngine is the browser engine to use (playwright or rod).
-	// Defaults to playwright if not set.
-	BrowserEngine BrowserEngine
 	// RodStealth enables stealth mode for go-rod to avoid bot detection.
-	// Only applicable when using BrowserEngineRod.
+	// Only applicable when building with -tags rod.
 	RodStealth bool
 }
 
