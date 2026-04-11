@@ -1,5 +1,3 @@
-//go:build !rod
-
 package playwright
 
 import (

@@ -40,7 +40,6 @@ func run() error {
 
 	var (
 		useJS       bool
-		useStealth  bool
 		cacheType   string
 		concurrency int
 		proxy       string
@@ -49,7 +48,6 @@ func run() error {
 	)
 
 	flag.BoolVar(&useJS, "js", false, "use javascript rendering")
-	flag.BoolVar(&useStealth, "stealth", false, "enable stealth mode (only with rod build tag)")
 	flag.StringVar(&cacheType, "cache", "", "use cache of type: file,leveldb DEFAULT: no cache")
 	flag.IntVar(&concurrency, "concurrency", 10, "concurrency")
 	flag.StringVar(&proxy, "proxy", "", "proxy to use")
@@ -92,7 +90,7 @@ func run() error {
 	}
 
 	if useJS {
-		httpFetcher, err = newJSFetcher(concurrency, rotator, useStealth)
+		httpFetcher, err = newJSFetcher(concurrency, rotator)
 		if err != nil {
 			return err
 		}

@@ -54,7 +54,7 @@ func (pr *Rotator) Proxies() []string {
 func (pr *Rotator) Next() scrapemate.Proxy {
 	current := atomic.AddUint32(&pr.current, 1) - 1
 
-	p := pr.proxies[current%uint32(len(pr.proxies))] //nolint:gosec // no overflow here
+	p := pr.proxies[current%uint32(len(pr.proxies))]
 
 	return p
 }

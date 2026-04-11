@@ -140,19 +140,17 @@ func WithUA(ua string) func(*jsOptions) {
 	}
 }
 
-// WithBrowserEngine is deprecated - use build tags instead.
-// Build with -tags rod to use go-rod, or without for Playwright.
+// WithBrowserEngine is deprecated and kept as a compatibility no-op.
 func WithBrowserEngine(_ string) func(*jsOptions) {
 	return func(_ *jsOptions) {
-		// No-op: browser engine is now selected at compile time via build tags
+		// No-op: rod support has been removed.
 	}
 }
 
-// WithRodStealth enables stealth mode for go-rod to avoid bot detection.
-// Only applicable when using BrowserEngineRod.
+// WithRodStealth is deprecated and kept as a compatibility no-op.
 func WithRodStealth() func(*jsOptions) {
-	return func(o *jsOptions) {
-		o.RodStealth = true
+	return func(_ *jsOptions) {
+		// No-op: rod support has been removed.
 	}
 }
 
@@ -173,9 +171,6 @@ type jsOptions struct {
 	DisableImages bool
 	// UA is the user agent to use.
 	UA string
-	// RodStealth enables stealth mode for go-rod to avoid bot detection.
-	// Only applicable when building with -tags rod.
-	RodStealth bool
 }
 
 type Config struct {

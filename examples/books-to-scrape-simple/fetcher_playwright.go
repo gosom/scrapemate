@@ -1,5 +1,3 @@
-//go:build !rod
-
 package main
 
 import (
@@ -7,7 +5,7 @@ import (
 	jsfetcher "github.com/gosom/scrapemate/adapters/fetchers/jshttp"
 )
 
-func newJSFetcher(concurrency int, rotator scrapemate.ProxyRotator, _ bool) (scrapemate.HTTPFetcher, error) {
+func newJSFetcher(concurrency int, rotator scrapemate.ProxyRotator) (scrapemate.HTTPFetcher, error) {
 	opts := jsfetcher.JSFetcherOptions{
 		Headless:      false,
 		DisableImages: false,

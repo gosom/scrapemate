@@ -41,7 +41,7 @@ type Locator interface {
 
 // BrowserPage is an abstraction over browser page implementations.
 // It provides a common interface for browser automation libraries
-// such as Playwright and go-rod.
+// such as Playwright.
 type BrowserPage interface {
 	// Goto navigates to a URL and waits for the specified state.
 	// Returns the page response with status code, headers, and body.
@@ -79,7 +79,7 @@ type BrowserPage interface {
 	// Close closes the page and releases resources.
 	Close() error
 
-	// Unwrap returns the underlying page object (e.g., playwright.Page or *rod.Page).
+	// Unwrap returns the underlying page object (e.g., playwright.Page).
 	// This allows users to access library-specific features when needed.
 	Unwrap() any
 }
