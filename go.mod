@@ -1,6 +1,6 @@
 module github.com/gosom/scrapemate
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/Noooste/azuretls-client v1.12.12

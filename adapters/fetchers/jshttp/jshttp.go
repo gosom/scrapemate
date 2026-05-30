@@ -2,6 +2,7 @@ package jshttp
 
 import (
 	"context"
+	"errors"
 
 	"github.com/playwright-community/playwright-go"
 
@@ -12,13 +13,14 @@ import (
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 
 type JSFetcherOptions struct {
-	Headless          bool
-	DisableImages     bool
-	Rotator           scrapemate.ProxyRotator
-	PoolSize          int
-	PageReuseLimit    int
-	BrowserReuseLimit int
-	UserAgent         string
+	Headless           bool
+	DisableImages      bool
+	Rotator            scrapemate.ProxyRotator
+	PoolSize           int
+	MaxPagesPerBrowser int
+	PageReuseLimit     int
+	BrowserReuseLimit  int
+	UserAgent          string
 }
 
 func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
@@ -51,26 +53,57 @@ func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 		}
 	}
 
-	ans := jsFetch{
-		pw:                pw,
-		headless:          params.Headless,
-		disableImages:     params.DisableImages,
-		pool:              make(chan *browser, params.PoolSize),
-		rotator:           params.Rotator,
-		pageReuseLimit:    params.PageReuseLimit,
-		browserReuseLimit: params.BrowserReuseLimit,
-		ua:                params.UserAgent,
-		proxyPool:         pool,
+	maxPagesPerBrowser := params.MaxPagesPerBrowser
+	if maxPagesPerBrowser < 1 {
+		maxPagesPerBrowser = 1
 	}
 
-	for range params.PoolSize {
-		b, err := newBrowser(pw, params.Headless, params.DisableImages, ans.proxyPool, params.UserAgent)
+	ans := jsFetch{
+		pw:                 pw,
+		headless:           params.Headless,
+		disableImages:      params.DisableImages,
+		pageReuseLimit:     params.PageReuseLimit,
+		browserReuseLimit:  params.BrowserReuseLimit,
+		ua:                 params.UserAgent,
+		proxyPool:          pool,
+		rotator:            params.Rotator,
+		maxPagesPerBrowser: maxPagesPerBrowser,
+	}
+
+	if maxPagesPerBrowser > 1 {
+		ans.pageSlots, err = newPageSlotPool(pageSlotPoolConfig{
+			poolSize:           params.PoolSize,
+			maxPagesPerBrowser: maxPagesPerBrowser,
+			factory: playwrightSlotFactory{
+				pw:            pw,
+				headless:      params.Headless,
+				disableImages: params.DisableImages,
+				proxyPool:     pool,
+				ua:            params.UserAgent,
+			},
+		})
 		if err != nil {
 			_ = ans.Close()
+
 			return nil, err
 		}
 
-		ans.pool <- b
+		return &ans, nil
+	}
+
+	ans.slots = make(chan *sessionSlot, params.PoolSize)
+
+	sessionFactory := &playwrightRuntimeFactory{
+		pw:            pw,
+		headless:      params.Headless,
+		disableImages: params.DisableImages,
+		proxyPool:     pool,
+		ua:            params.UserAgent,
+	}
+	ans.factory = sessionFactory
+
+	for range params.PoolSize {
+		ans.slots <- newSessionSlot(sessionFactory)
 	}
 
 	return &ans, nil
@@ -80,35 +113,46 @@ type jsFetch struct {
 	pw                *playwright.Playwright
 	headless          bool
 	disableImages     bool
-	pool              chan *browser
-	rotator           scrapemate.ProxyRotator
 	pageReuseLimit    int
 	browserReuseLimit int
 	ua                string
 	proxyPool         *ProxyPool
+	factory           runtimeFactory
+	slots             chan *sessionSlot
+	pageSlots         *pageSlotPool
+
+	rotator            scrapemate.ProxyRotator
+	maxPagesPerBrowser int
 }
 
-func (o *jsFetch) GetBrowser(ctx context.Context) (*browser, error) {
+func (o *jsFetch) getSlot(ctx context.Context) (*sessionSlot, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case ans := <-o.pool:
-		if ans.browser.IsConnected() && (o.browserReuseLimit <= 0 || ans.browserUsage < o.browserReuseLimit) {
-			return ans, nil
-		}
-
-		ans.browser.Close()
-	default:
+	case slot := <-o.slots:
+		return slot, nil
 	}
+}
 
-	return newBrowser(o.pw, o.headless, o.disableImages, o.proxyPool, o.ua)
+func (o *jsFetch) putSlot(ctx context.Context, slot *sessionSlot) {
+	select {
+	case <-ctx.Done():
+		_ = slot.close()
+	case o.slots <- slot:
+	}
 }
 
 func (o *jsFetch) Close() error {
-	close(o.pool)
+	if o.pageSlots != nil {
+		o.pageSlots.close()
+	}
 
-	for b := range o.pool {
-		b.Close()
+	if o.slots != nil {
+		close(o.slots)
+
+		for slot := range o.slots {
+			slot.close()
+		}
 	}
 
 	_ = o.pw.Stop()
@@ -116,33 +160,56 @@ func (o *jsFetch) Close() error {
 	return nil
 }
 
-func (o *jsFetch) PutBrowser(ctx context.Context, b *browser) {
-	if !b.browser.IsConnected() {
-		b.Close()
-
-		return
-	}
-
-	select {
-	case <-ctx.Done():
-		b.Close()
-	case o.pool <- b:
-	default:
-		b.Close()
-	}
-}
-
 // Fetch fetches the url specicied by the job and returns the response
 func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
-	browser, err := o.GetBrowser(ctx)
+	if o.maxPagesPerBrowser > 1 {
+		return o.fetchWithPageSlot(ctx, job)
+	}
+
+	slot, err := o.getSlot(ctx)
 	if err != nil {
 		return scrapemate.Response{
 			Error: err,
 		}
 	}
 
-	defer o.PutBrowser(ctx, browser)
+	defer o.putSlot(ctx, slot)
 
+	p, err := slot.acquirePage(ctx)
+	if err != nil {
+		return scrapemate.Response{
+			Error: err,
+		}
+	}
+
+	pp, ok := p.(*playwrightPage)
+	if !ok {
+		return scrapemate.Response{
+			Error: errors.New("unexpected page type"),
+		}
+	}
+
+	if job.GetTimeout() > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, job.GetTimeout())
+
+		defer cancel()
+
+		pp.playwrightPage().SetDefaultTimeout(float64(job.GetTimeout().Milliseconds()))
+	}
+
+	wrappedPage := playwrightadapter.NewPage(pp.playwrightPage())
+
+	resp := job.BrowserActions(ctx, wrappedPage)
+
+	if cleanErr := slot.release(ctx); cleanErr != nil && resp.Error == nil {
+		resp.Error = cleanErr
+	}
+
+	return resp
+}
+
+func (o *jsFetch) fetchWithPageSlot(ctx context.Context, job scrapemate.IJob) scrapemate.Response {
 	if job.GetTimeout() > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, job.GetTimeout())
@@ -150,42 +217,29 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 		defer cancel()
 	}
 
-	var page playwright.Page
-
-	if len(browser.ctx.Pages()) > 0 {
-		page = browser.ctx.Pages()[0]
-
-		for i := 1; i < len(browser.ctx.Pages()); i++ {
-			browser.ctx.Pages()[i].Close()
-		}
-	} else {
-		page, err = browser.ctx.NewPage()
-		if err != nil {
-			return scrapemate.Response{
-				Error: err,
-			}
-		}
+	lease, err := o.pageSlots.acquire(ctx)
+	if err != nil {
+		return scrapemate.Response{Error: err}
 	}
 
-	// match the browser default timeout to the job timeout
+	defer lease.release(ctx)
+
+	page, err := lease.slot.ctx.NewPage()
+	if err != nil {
+		return scrapemate.Response{Error: err}
+	}
+
+	defer page.Close()
+
 	if job.GetTimeout() > 0 {
 		page.SetDefaultTimeout(float64(job.GetTimeout().Milliseconds()))
 	}
 
-	browser.page0Usage++
-	browser.browserUsage++
+	lease.slot.mu.Lock()
+	lease.slot.browserUsage++
+	lease.slot.mu.Unlock()
 
-	defer func() {
-		if o.pageReuseLimit == 0 || browser.page0Usage >= o.pageReuseLimit {
-			_ = page.Close()
-
-			browser.page0Usage = 0
-		}
-	}()
-
-	wrappedPage := playwrightadapter.NewPage(page)
-
-	return job.BrowserActions(ctx, wrappedPage)
+	return job.BrowserActions(ctx, playwrightadapter.NewPage(page))
 }
 
 type browser struct {
