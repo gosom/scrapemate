@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JavaScript rendering is now Playwright-only
 - `scrapemateapp.WithBrowserEngine()` and `scrapemateapp.WithRodStealth()` remain as deprecated no-op compatibility shims
 
+### Fixed
+
+- `jshttp`: `page.Close()` is now time-bounded (5 s default via `closeWithTimeout`).
+  A wedged Playwright driver (e.g. EPIPE after a browser crash) could make
+  `page.Close()` block indefinitely, stalling the worker goroutine and preventing
+  the fetcher from returning. The cleanup goroutine is now abandoned after the
+  deadline so the worker is freed. Backward-compatible — no API change; in the
+  healthy case `Close` returns within milliseconds and the deadline is never reached.
+
 ## [1.0.0] - 2026-01-06
 
 ### Breaking Changes
