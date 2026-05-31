@@ -21,12 +21,20 @@ type JSFetcherOptions struct {
 	PageReuseLimit     int
 	BrowserReuseLimit  int
 	UserAgent          string
+	// BrowserType selects the Playwright browser engine. Accepted values are
+	// "chromium" (the default, also for the empty string), "firefox" and
+	// "webkit". Callers that never set this field keep the existing Chromium
+	// behaviour unchanged.
+	BrowserType string
+	// ExecutablePath, when non-empty, overrides the Playwright-managed browser
+	// binary (for example a custom Firefox build). Empty uses the bundled binary.
+	ExecutablePath string
 }
 
 func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 	opts := []*playwright.RunOptions{
 		{
-			Browsers: []string{"chromium"},
+			Browsers: browsersToInstall(params.BrowserType),
 			Verbose:  true,
 		},
 	}
@@ -75,11 +83,13 @@ func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 			poolSize:           params.PoolSize,
 			maxPagesPerBrowser: maxPagesPerBrowser,
 			factory: playwrightSlotFactory{
-				pw:            pw,
-				headless:      params.Headless,
-				disableImages: params.DisableImages,
-				proxyPool:     pool,
-				ua:            params.UserAgent,
+				pw:             pw,
+				headless:       params.Headless,
+				disableImages:  params.DisableImages,
+				proxyPool:      pool,
+				ua:             params.UserAgent,
+				browserType:    params.BrowserType,
+				executablePath: params.ExecutablePath,
 			},
 		})
 		if err != nil {
@@ -94,11 +104,13 @@ func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 	ans.slots = make(chan *sessionSlot, params.PoolSize)
 
 	sessionFactory := &playwrightRuntimeFactory{
-		pw:            pw,
-		headless:      params.Headless,
-		disableImages: params.DisableImages,
-		proxyPool:     pool,
-		ua:            params.UserAgent,
+		pw:             pw,
+		headless:       params.Headless,
+		disableImages:  params.DisableImages,
+		proxyPool:      pool,
+		ua:             params.UserAgent,
+		browserType:    params.BrowserType,
+		executablePath: params.ExecutablePath,
 	}
 	ans.factory = sessionFactory
 
@@ -254,39 +266,85 @@ func (o *browser) Close() {
 	_ = o.browser.Close()
 }
 
-func newBrowser(pw *playwright.Playwright, headless, disableImages bool, proxyPool *ProxyPool, ua string) (*browser, error) {
-	opts := playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(headless),
-		Args: []string{
-			`--start-maximized`,
-			`--no-default-browser-check`,
-			`--disable-dev-shm-usage`,
-			`--no-sandbox`,
-			`--disable-setuid-sandbox`,
-			`--no-zygote`,
-			`--disable-gpu`,
-			`--mute-audio`,
-			`--disable-extensions`,
-			`--single-process`,
-			`--disable-breakpad`,
-			`--disable-features=TranslateUI,BlinkGenPropertyTrees`,
-			`--disable-ipc-flooding-protection`,
-			`--enable-features=NetworkService,NetworkServiceInProcess`,
-			"--enable-features=NetworkService",
-			`--disable-default-apps`,
-			`--disable-notifications`,
-			`--disable-webgl`,
-			`--disable-blink-features=AutomationControlled`,
-			"--ignore-certificate-errors",
-			"--ignore-certificate-errors-spki-list",
-			"--disable-web-security",
-		},
+// browsersToInstall maps a BrowserType value to the Playwright install list.
+// An empty string or "chromium" both install Chromium so that callers that
+// never set BrowserType are unaffected.
+func browsersToInstall(browserType string) []string {
+	switch browserType {
+	case "firefox":
+		return []string{"firefox"}
+	case "webkit":
+		return []string{"webkit"}
+	default:
+		return []string{"chromium"}
+	}
+}
+
+// chromiumLaunchArgs are the Chromium-specific command-line flags. They are only
+// passed when launching Chromium: Firefox and WebKit reject or mishandle these
+// flags, and forwarding them causes Firefox to hang on the first NewPage call.
+func chromiumLaunchArgs(disableImages bool) []string {
+	args := []string{
+		`--start-maximized`,
+		`--no-default-browser-check`,
+		`--disable-dev-shm-usage`,
+		`--no-sandbox`,
+		`--disable-setuid-sandbox`,
+		`--no-zygote`,
+		`--disable-gpu`,
+		`--mute-audio`,
+		`--disable-extensions`,
+		`--single-process`,
+		`--disable-breakpad`,
+		`--disable-features=TranslateUI,BlinkGenPropertyTrees`,
+		`--disable-ipc-flooding-protection`,
+		`--enable-features=NetworkService,NetworkServiceInProcess`,
+		"--enable-features=NetworkService",
+		`--disable-default-apps`,
+		`--disable-notifications`,
+		`--disable-webgl`,
+		`--disable-blink-features=AutomationControlled`,
+		"--ignore-certificate-errors",
+		"--ignore-certificate-errors-spki-list",
+		"--disable-web-security",
 	}
 	if disableImages {
-		opts.Args = append(opts.Args, `--blink-settings=imagesEnabled=false`)
+		args = append(args, `--blink-settings=imagesEnabled=false`)
 	}
 
-	br, err := pw.Chromium.Launch(opts)
+	return args
+}
+
+// browserTypeFor returns the playwright.BrowserType for the configured engine.
+// Empty or "chromium" return Chromium so existing callers are unaffected.
+func browserTypeFor(pw *playwright.Playwright, browserType string) playwright.BrowserType {
+	switch browserType {
+	case "firefox":
+		return pw.Firefox
+	case "webkit":
+		return pw.WebKit
+	default:
+		return pw.Chromium
+	}
+}
+
+func newBrowser(pw *playwright.Playwright, headless, disableImages bool, proxyPool *ProxyPool, ua, browserType, executablePath string) (*browser, error) {
+	opts := playwright.BrowserTypeLaunchOptions{
+		Headless: playwright.Bool(headless),
+	}
+
+	// Chromium launch flags only apply to Chromium. Firefox/WebKit use the
+	// Playwright engine defaults; forwarding Chromium flags hangs Firefox at
+	// the first NewPage.
+	if browserType == "" || browserType == "chromium" {
+		opts.Args = chromiumLaunchArgs(disableImages)
+	}
+
+	if executablePath != "" {
+		opts.ExecutablePath = playwright.String(executablePath)
+	}
+
+	br, err := browserTypeFor(pw, browserType).Launch(opts)
 	if err != nil {
 		return nil, err
 	}
