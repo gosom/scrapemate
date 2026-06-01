@@ -29,6 +29,7 @@ func closeWithTimeout(closer func() error, d time.Duration) {
 
 	go func() {
 		_ = closer()
+
 		close(done)
 	}()
 
