@@ -1,4 +1,4 @@
-package playwright
+package playwright_test
 
 // Unit tests for the RequestHookProvider implementation on *Page.
 //
@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gosom/scrapemate"
+	playwrightadapter "github.com/gosom/scrapemate/adapters/browsers/playwright"
 )
 
 // minimalPage is a BrowserPage that does NOT implement RequestHookProvider. It
@@ -23,24 +24,25 @@ import (
 // type assertion continue to work when the page does not support hooks.
 type minimalPage struct{}
 
-func (m *minimalPage) Goto(_ string, _ scrapemate.WaitUntilState) (*scrapemate.PageResponse, error) {
+func (*minimalPage) Goto(_ string, _ scrapemate.WaitUntilState) (*scrapemate.PageResponse, error) {
 	return &scrapemate.PageResponse{StatusCode: 200}, nil
 }
-func (m *minimalPage) URL() string                                     { return "" }
-func (m *minimalPage) Content() (string, error)                       { return "", nil }
-func (m *minimalPage) Reload(_ scrapemate.WaitUntilState) error        { return nil }
-func (m *minimalPage) Screenshot(_ bool) ([]byte, error)              { return nil, nil }
-func (m *minimalPage) Eval(_ string, _ ...any) (any, error)           { return nil, nil }
-func (m *minimalPage) WaitForURL(_ string, _ time.Duration) error      { return nil }
-func (m *minimalPage) WaitForSelector(_ string, _ time.Duration) error { return nil }
-func (m *minimalPage) WaitForTimeout(_ time.Duration)                  {}
-func (m *minimalPage) Locator(_ string) scrapemate.Locator             { return nil }
-func (m *minimalPage) Close() error                                    { return nil }
-func (m *minimalPage) Unwrap() any                                     { return nil }
+func (*minimalPage) URL() string                                     { return "" }
+func (*minimalPage) Content() (string, error)                        { return "", nil }
+func (*minimalPage) Reload(_ scrapemate.WaitUntilState) error        { return nil }
+func (*minimalPage) Screenshot(_ bool) ([]byte, error)               { return nil, nil }
+func (*minimalPage) Eval(_ string, _ ...any) (any, error)            { return nil, nil }
+func (*minimalPage) WaitForURL(_ string, _ time.Duration) error      { return nil }
+func (*minimalPage) WaitForSelector(_ string, _ time.Duration) error { return nil }
+func (*minimalPage) WaitForTimeout(_ time.Duration)                  {}
+func (*minimalPage) Locator(_ string) scrapemate.Locator             { return nil }
+func (*minimalPage) Close() error                                    { return nil }
+func (*minimalPage) Unwrap() any                                     { return nil }
 
 // Compile-time assertion: minimalPage satisfies BrowserPage but NOT
 // RequestHookProvider.
 var _ scrapemate.BrowserPage = (*minimalPage)(nil)
+var _ scrapemate.RequestHookProvider = (*playwrightadapter.Page)(nil)
 
 // TestBackwardCompat_NonHookPage verifies that a BrowserPage without
 // RequestHookProvider is handled gracefully by the guarded consumer pattern.
@@ -48,8 +50,10 @@ func TestBackwardCompat_NonHookPage(t *testing.T) {
 	var page scrapemate.BrowserPage = &minimalPage{}
 
 	hookRegistered := false
+
 	if hook, ok := page.(scrapemate.RequestHookProvider); ok {
 		hook.OnRequest(func(_ string, _ map[string]string) {})
+
 		hookRegistered = true
 	}
 
