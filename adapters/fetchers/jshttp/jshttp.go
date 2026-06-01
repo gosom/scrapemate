@@ -31,6 +31,7 @@ type JSFetcherOptions struct {
 	ExecutablePath string
 }
 
+//nolint:gocritic // Keep value parameter to preserve the public constructor API.
 func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
 	opts := []*playwright.RunOptions{
 		{

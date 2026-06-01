@@ -1,4 +1,4 @@
-package jshttp
+package jshttp //nolint:testpackage // Need access to unexported browser selection helpers.
 
 import "testing"
 
