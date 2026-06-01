@@ -9,9 +9,11 @@ import (
 )
 
 type jsOptions struct {
-	Headfull      bool
-	DisableImages bool
-	UA            string
+	Headfull       bool
+	DisableImages  bool
+	UA             string
+	BrowserType    string
+	ExecutablePath string
 }
 
 type Config struct {
@@ -191,6 +193,28 @@ func DisableImages() func(*jsOptions) {
 func WithUA(ua string) func(*jsOptions) {
 	return func(o *jsOptions) {
 		o.UA = ua
+	}
+}
+
+// WithJSBrowserType selects the Playwright browser engine for JS rendering.
+// Accepted values are "chromium" (the default), "firefox" and "webkit". The
+// empty string keeps the default Chromium behaviour.
+//
+// Example: WithJS(WithJSBrowserType("firefox"))
+func WithJSBrowserType(browserType string) func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.BrowserType = browserType
+	}
+}
+
+// WithJSExecutablePath overrides the Playwright-managed browser binary with the
+// one at the given path (for example a custom Firefox build). Empty uses the
+// bundled binary.
+//
+// Example: WithJS(WithJSBrowserType("firefox"), WithJSExecutablePath("/opt/firefox/firefox"))
+func WithJSExecutablePath(path string) func(*jsOptions) {
+	return func(o *jsOptions) {
+		o.ExecutablePath = path
 	}
 }
 

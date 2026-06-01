@@ -110,15 +110,17 @@ func (p *pageSlotPool) close() {
 }
 
 type playwrightSlotFactory struct {
-	pw            *playwright.Playwright
-	headless      bool
-	disableImages bool
-	proxyPool     *ProxyPool
-	ua            string
+	pw             *playwright.Playwright
+	headless       bool
+	disableImages  bool
+	proxyPool      *ProxyPool
+	ua             string
+	browserType    string
+	executablePath string
 }
 
 func (f playwrightSlotFactory) newSlot() (*pageSlot, error) {
-	b, err := newBrowser(f.pw, f.headless, f.disableImages, f.proxyPool, f.ua)
+	b, err := newBrowser(f.pw, f.headless, f.disableImages, f.proxyPool, f.ua, f.browserType, f.executablePath)
 	if err != nil {
 		return nil, err
 	}

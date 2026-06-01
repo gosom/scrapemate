@@ -96,36 +96,42 @@ func (s *sessionSlot) release(ctx context.Context) error {
 }
 
 type playwrightRuntimeFactory struct {
-	pw            *playwright.Playwright
-	headless      bool
-	disableImages bool
-	proxyPool     *ProxyPool
-	ua            string
+	pw             *playwright.Playwright
+	headless       bool
+	disableImages  bool
+	proxyPool      *ProxyPool
+	ua             string
+	browserType    string
+	executablePath string
 }
 
 func (f *playwrightRuntimeFactory) create(context.Context) (slotRuntime, error) {
-	b, err := newBrowser(f.pw, f.headless, f.disableImages, f.proxyPool, f.ua)
+	b, err := newBrowser(f.pw, f.headless, f.disableImages, f.proxyPool, f.ua, f.browserType, f.executablePath)
 	if err != nil {
 		return nil, err
 	}
 
 	return &playwrightRuntime{
-		browser:       b,
-		pw:            f.pw,
-		headless:      f.headless,
-		disableImages: f.disableImages,
-		proxyPool:     f.proxyPool,
-		ua:            f.ua,
+		browser:        b,
+		pw:             f.pw,
+		headless:       f.headless,
+		disableImages:  f.disableImages,
+		proxyPool:      f.proxyPool,
+		ua:             f.ua,
+		browserType:    f.browserType,
+		executablePath: f.executablePath,
 	}, nil
 }
 
 type playwrightRuntime struct {
-	browser       *browser
-	pw            *playwright.Playwright
-	headless      bool
-	disableImages bool
-	proxyPool     *ProxyPool
-	ua            string
+	browser        *browser
+	pw             *playwright.Playwright
+	headless       bool
+	disableImages  bool
+	proxyPool      *ProxyPool
+	ua             string
+	browserType    string
+	executablePath string
 }
 
 func (r *playwrightRuntime) pageCount() int {
@@ -194,7 +200,7 @@ func (r *playwrightRuntime) recreateContext() error {
 func (r *playwrightRuntime) recreateBrowser() error {
 	r.browser.Close()
 
-	b, err := newBrowser(r.pw, r.headless, r.disableImages, r.proxyPool, r.ua)
+	b, err := newBrowser(r.pw, r.headless, r.disableImages, r.proxyPool, r.ua, r.browserType, r.executablePath)
 	if err != nil {
 		return err
 	}

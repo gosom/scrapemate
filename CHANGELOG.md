@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `jshttp`: optional Firefox/WebKit browser engine for JS rendering via
+  `JSFetcherOptions.BrowserType` (`"chromium"` default, `"firefox"`, `"webkit"`)
+  and `JSFetcherOptions.ExecutablePath` to override the browser binary. Exposed
+  through `scrapemateapp.WithJSBrowserType(...)` and
+  `scrapemateapp.WithJSExecutablePath(...)` as `WithJS` sub-options. Chromium
+  launch flags are only applied to Chromium; Firefox/WebKit use the Playwright
+  engine defaults. Backward-compatible — the empty default keeps Chromium.
+
 ### Removed
 
 - Rod browser support, build tags, and related fetcher/page implementations
