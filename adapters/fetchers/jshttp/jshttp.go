@@ -198,9 +198,7 @@ func (o *jsFetch) Fetch(ctx context.Context, job scrapemate.IJob) scrapemate.Res
 		pp.playwrightPage().SetDefaultTimeout(float64(job.GetTimeout().Milliseconds()))
 	}
 
-	wrappedPage := playwrightadapter.NewPage(pp.playwrightPage())
-
-	resp := job.BrowserActions(ctx, wrappedPage)
+	resp := runBrowserActions(ctx, job, playwrightadapter.NewPage(pp.playwrightPage()))
 
 	if cleanErr := slot.release(ctx); cleanErr != nil && resp.Error == nil {
 		resp.Error = cleanErr
@@ -239,7 +237,15 @@ func (o *jsFetch) fetchWithPageSlot(ctx context.Context, job scrapemate.IJob) sc
 	lease.slot.browserUsage++
 	lease.slot.mu.Unlock()
 
-	return job.BrowserActions(ctx, playwrightadapter.NewPage(page))
+	return runBrowserActions(ctx, job, playwrightadapter.NewPage(page))
+}
+
+func runBrowserActions(ctx context.Context, job scrapemate.IJob, page scrapemate.BrowserPage) scrapemate.Response {
+	if hooks, ok := page.(interface{ ClearNetworkHooks() }); ok {
+		defer hooks.ClearNetworkHooks()
+	}
+
+	return job.BrowserActions(ctx, page)
 }
 
 type browser struct {
