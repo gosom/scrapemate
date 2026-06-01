@@ -10,6 +10,7 @@ import (
 )
 
 var _ scrapemate.BrowserPage = (*Page)(nil)
+var _ scrapemate.RequestHookProvider = (*Page)(nil)
 var _ scrapemate.Locator = (*Locator)(nil)
 
 // Page wraps a playwright.Page and implements scrapemate.BrowserPage.
@@ -155,4 +156,26 @@ func toPlaywrightWaitUntil(state scrapemate.WaitUntilState) *playwright.WaitUnti
 	default:
 		return playwright.WaitUntilStateLoad
 	}
+}
+
+// OnRequest implements scrapemate.RequestHookProvider. The handler is called for
+// every outgoing request with the request URL and a lower-cased header map.
+func (p *Page) OnRequest(handler func(url string, headers map[string]string)) {
+	p.page.OnRequest(func(req playwright.Request) {
+		// req.Headers() is non-blocking — it returns the headers captured at
+		// request creation without a protocol round-trip, so it is safe to call
+		// inside this event handler. req.AllHeaders() would block on a protocol
+		// response while the event loop is already in a dispatch callback.
+		handler(req.URL(), req.Headers())
+	})
+}
+
+// OnResponse implements scrapemate.RequestHookProvider. The handler is called
+// for every response with the response URL, status code and a lower-cased
+// header map.
+func (p *Page) OnResponse(handler func(url string, statusCode int, headers map[string]string)) {
+	p.page.OnResponse(func(resp playwright.Response) {
+		// resp.Headers() is non-blocking; resp.AllHeaders() would block.
+		handler(resp.URL(), resp.Status(), resp.Headers())
+	})
 }
