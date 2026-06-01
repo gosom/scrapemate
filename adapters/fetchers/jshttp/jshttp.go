@@ -3,6 +3,7 @@ package jshttp
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/playwright-community/playwright-go"
 
@@ -11,6 +12,32 @@ import (
 )
 
 var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
+
+// closeTimeout is the maximum time allowed for a Playwright page.Close() before
+// the caller abandons it. A wedged Playwright driver (e.g. EPIPE after a browser
+// crash) can make Close block forever; abandoning it frees the worker goroutine
+// at the cost of leaking the underlying resource.
+const closeTimeout = 5 * time.Second
+
+// closeWithTimeout runs closer in a background goroutine and returns when it
+// completes or when d elapses, whichever comes first. On timeout the goroutine
+// is abandoned (it will finish on its own if the driver recovers). Without this
+// bound, a hung Close propagates through the worker WaitGroup and prevents the
+// caller from being unblocked even by context cancellation.
+func closeWithTimeout(closer func() error, d time.Duration) {
+	done := make(chan struct{})
+
+	go func() {
+		_ = closer()
+
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(d):
+	}
+}
 
 type JSFetcherOptions struct {
 	Headless           bool
@@ -229,7 +256,7 @@ func (o *jsFetch) fetchWithPageSlot(ctx context.Context, job scrapemate.IJob) sc
 		return scrapemate.Response{Error: err}
 	}
 
-	defer page.Close()
+	defer closeWithTimeout(func() error { return page.Close() }, closeTimeout)
 
 	if job.GetTimeout() > 0 {
 		page.SetDefaultTimeout(float64(job.GetTimeout().Milliseconds()))
