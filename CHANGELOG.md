@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `RequestHookProvider` — optional capability interface for `BrowserPage`
+  implementations that can intercept outgoing requests and responses. Consumers
+  opt in via a type assertion (`if hook, ok := page.(scrapemate.RequestHookProvider); ok { ... }`),
+  so existing `BrowserPage` implementations are unaffected. The Playwright page
+  adapter implements it; handlers receive the URL and a lower-cased header map
+  read via the non-blocking `req.Headers()` / `resp.Headers()` (no protocol
+  round-trip, safe inside the event loop). Useful for capturing auth tokens that
+  an SPA attaches to its API XHRs client-side.
+
 ### Removed
 
 - Rod browser support, build tags, and related fetcher/page implementations

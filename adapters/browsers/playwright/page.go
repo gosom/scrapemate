@@ -2,6 +2,7 @@ package playwright
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/playwright-community/playwright-go"
@@ -10,11 +11,16 @@ import (
 )
 
 var _ scrapemate.BrowserPage = (*Page)(nil)
+var _ scrapemate.RequestHookProvider = (*Page)(nil)
 var _ scrapemate.Locator = (*Locator)(nil)
 
 // Page wraps a playwright.Page and implements scrapemate.BrowserPage.
 type Page struct {
 	page playwright.Page
+
+	networkHooksMu   sync.Mutex
+	requestHandlers  []func(playwright.Request)
+	responseHandlers []func(playwright.Response)
 }
 
 // NewPage creates a new Page wrapper around a playwright.Page.
@@ -154,5 +160,59 @@ func toPlaywrightWaitUntil(state scrapemate.WaitUntilState) *playwright.WaitUnti
 		return playwright.WaitUntilStateNetworkidle
 	default:
 		return playwright.WaitUntilStateLoad
+	}
+}
+
+// OnRequest implements scrapemate.RequestHookProvider. The handler is called for
+// every outgoing request with the request URL and a lower-cased header map.
+func (p *Page) OnRequest(handler func(url string, headers map[string]string)) {
+	playwrightHandler := func(req playwright.Request) {
+		// req.Headers() is non-blocking — it returns the headers captured at
+		// request creation without a protocol round-trip, so it is safe to call
+		// inside this event handler. req.AllHeaders() would block on a protocol
+		// response while the event loop is already in a dispatch callback.
+		handler(req.URL(), req.Headers())
+	}
+
+	p.networkHooksMu.Lock()
+	p.requestHandlers = append(p.requestHandlers, playwrightHandler)
+	p.networkHooksMu.Unlock()
+
+	p.page.OnRequest(playwrightHandler)
+}
+
+// OnResponse implements scrapemate.RequestHookProvider. The handler is called
+// for every response with the response URL, status code and a lower-cased
+// header map.
+func (p *Page) OnResponse(handler func(url string, statusCode int, headers map[string]string)) {
+	playwrightHandler := func(resp playwright.Response) {
+		// resp.Headers() is non-blocking; resp.AllHeaders() would block.
+		handler(resp.URL(), resp.Status(), resp.Headers())
+	}
+
+	p.networkHooksMu.Lock()
+	p.responseHandlers = append(p.responseHandlers, playwrightHandler)
+	p.networkHooksMu.Unlock()
+
+	p.page.OnResponse(playwrightHandler)
+}
+
+// ClearNetworkHooks removes request and response handlers registered through
+// this wrapper. It leaves any listeners registered directly on the underlying
+// Playwright page untouched.
+func (p *Page) ClearNetworkHooks() {
+	p.networkHooksMu.Lock()
+	requestHandlers := p.requestHandlers
+	responseHandlers := p.responseHandlers
+	p.requestHandlers = nil
+	p.responseHandlers = nil
+	p.networkHooksMu.Unlock()
+
+	for _, handler := range requestHandlers {
+		p.page.RemoveListener("request", handler)
+	}
+
+	for _, handler := range responseHandlers {
+		p.page.RemoveListener("response", handler)
 	}
 }
