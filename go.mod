@@ -7,7 +7,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/gosom/kit v0.0.0-20230309082109-543b32ac686a
-	github.com/playwright-community/playwright-go v0.5700.1
+	github.com/mxschmitt/playwright-go v0.6100.0
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/mock v0.6.0

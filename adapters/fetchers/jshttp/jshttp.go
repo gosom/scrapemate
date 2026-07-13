@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 
 	"github.com/gosom/scrapemate"
 	playwrightadapter "github.com/gosom/scrapemate/adapters/browsers/playwright"

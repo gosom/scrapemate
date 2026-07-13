@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 )
 
 type pageSlotFactory interface {

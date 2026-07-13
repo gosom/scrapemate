@@ -28,7 +28,7 @@ Scrapemate uses Playwright for JavaScript rendering. It requires the Playwright 
 
 ```bash
 # Install playwright browsers
-go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
+go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps chromium
 ```
 
 Build and run without any special tags:
@@ -43,7 +43,7 @@ The [books-to-scrape-simple](https://github.com/gosom/scrapemate/tree/main/examp
 
 ```bash
 # Run with Playwright (default)
-# First install browsers: go run github.com/playwright-community/playwright-go/cmd/playwright install --with-deps chromium
+# First install browsers: go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps chromium
 go run . -js
 ```
 
