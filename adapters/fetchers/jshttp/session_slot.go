@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 )
 
 var errNoPages = errors.New("no pages available")
