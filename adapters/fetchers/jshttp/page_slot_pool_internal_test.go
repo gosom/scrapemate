@@ -42,11 +42,13 @@ func TestPageSlotPoolLimitsConcurrentPagesPerBrowser(t *testing.T) {
 	defer lease2.release(ctx)
 
 	blocked := make(chan struct{})
+
 	go func() {
 		lease3, acquireErr := pool.acquire(ctx)
 		require.NoError(t, acquireErr)
 
 		defer lease3.release(ctx)
+
 		close(blocked)
 	}()
 

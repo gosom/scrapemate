@@ -67,10 +67,9 @@ func TestRotatorNext(t *testing.T) {
 }
 
 func TestRotatorRoundTrip(t *testing.T) {
-	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	testServer := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	defer testServer.Close()
 
 	t.Run("creates and caches transport", func(t *testing.T) {
 		proxies := []string{

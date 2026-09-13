@@ -74,6 +74,7 @@ func TestNewProxy(t *testing.T) {
 			},
 			expectError: false,
 		},
+		//nolint:gosec // G101: deliberately invalid test input, not a credential.
 		{
 			name:        "invalid scheme",
 			input:       "ftp://user:pass@example.com:1080",

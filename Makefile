@@ -16,6 +16,9 @@ generate: ## runs go generate
 test: ## runs the unit tests
 	go test -v -race -timeout 5m ./...
 
+test-leaks: ## checks the JS fetcher tests for leaked goroutines
+	SCRAPEMATE_CHECK_GOROUTINE_LEAKS=1 go test -race -timeout 5m ./adapters/fetchers/jshttp
+
 test-cover: ## outputs the coverage statistics
 	go test -v -race -timeout 5m ./... -coverprofile coverage.out
 	go tool cover -func coverage.out
