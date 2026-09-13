@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/gosom/scrapemate"
 	"github.com/gosom/scrapemate/adapters/cache/filecache"

@@ -79,6 +79,7 @@ func Test_New_With_Options(t *testing.T) {
 	t.Run("with context", func(t *testing.T) {
 		ctx, cancel := context.WithCancelCause(context.Background())
 		defer cancel(errors.New("test"))
+
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
 			scrapemate.WithHTTPFetcher(svc.fetcher),
@@ -209,6 +210,7 @@ func Test_Done_Err(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, mate)
 	cancelFn(errors.New("test"))
+
 	select {
 	case <-mate.Done():
 	default:
@@ -328,6 +330,7 @@ func Test_Start(t *testing.T) {
 			err = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 			require.NoError(t, err)
 		}
+
 		require.NoError(t, mate.Err())
 	})
 	t.Run("handles job provider errors", func(t *testing.T) {
@@ -434,7 +437,9 @@ func Test_Start(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			require.Fail(t, "timeout")
 		}
+
 		cancel(scrapemate.ErrorExitSignal)
+
 		select {
 		case err := <-mateErr:
 			require.Equal(t, scrapemate.ErrorExitSignal, err)
@@ -540,6 +545,7 @@ func Test_Start(t *testing.T) {
 
 		ch := func() <-chan scrapemate.IJob {
 			ans := make(chan scrapemate.IJob, 1)
+
 			j := testJobWithNext{
 				Job: scrapemate.Job{
 					URL: "http://example.com",

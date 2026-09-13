@@ -213,7 +213,7 @@ func (p *AuthProxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, r.Method, r.URL.String(), r.Body)
+	req, err := http.NewRequestWithContext(ctx, r.Method, r.URL.String(), r.Body) //nolint:gosec // G704: this proxy intentionally forwards the caller's URL.
 	if err != nil {
 		http.Error(w, "Failed to create request", http.StatusBadRequest)
 
@@ -230,7 +230,7 @@ func (p *AuthProxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		req.Header.Set("Proxy-Authorization", "Basic "+p.auth)
 	}
 
-	resp, err := p.client.Do(req)
+	resp, err := p.client.Do(req) //nolint:gosec // G704: the caller's URL is the intended proxy destination.
 	if err != nil {
 		p.logger.Printf("HTTP request failed: %v", err)
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)

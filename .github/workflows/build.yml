@@ -18,14 +18,14 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        go: ['>=1.20.0']
+        go: ['1.27.1']
 
     steps:
       - name: Check out code
         uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go }}
           check-latest: true

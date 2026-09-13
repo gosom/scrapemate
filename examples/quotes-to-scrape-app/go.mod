@@ -1,10 +1,9 @@
 module githbub.com/gosom/scrapemate/quotestoscrapeapp
 
-go 1.26.2
+go 1.27.1
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
-	github.com/google/uuid v1.6.0
 	github.com/gosom/scrapemate v1.0.0
 )
 
@@ -34,18 +33,18 @@ require (
 	github.com/gosom/kit v0.0.0-20230309082109-543b32ac686a // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect
-	github.com/playwright-community/playwright-go v0.5700.1 // indirect
+	github.com/mxschmitt/playwright-go v0.6100.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/refraction-networking/utls v1.8.2 // indirect
 	github.com/rs/zerolog v1.35.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
-	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )
 
 replace github.com/gosom/scrapemate => ../../

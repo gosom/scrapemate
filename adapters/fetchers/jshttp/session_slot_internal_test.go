@@ -30,6 +30,7 @@ func TestGetSlotWaitsAtCapacityInsteadOfCreatingOverflowBrowser(t *testing.T) {
 	}
 
 	done := make(chan error, 1)
+
 	go func() {
 		_, err := fetcher.getSlot(ctx)
 		done <- err
