@@ -3,6 +3,7 @@ package jshttp
 import (
 	"context"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/mxschmitt/playwright-go"
@@ -17,7 +18,11 @@ var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 // the caller abandons it. A wedged Playwright driver (e.g. EPIPE after a browser
 // crash) can make Close block forever; abandoning it frees the worker goroutine
 // at the cost of leaking the underlying resource.
-const closeTimeout = 5 * time.Second
+const (
+	closeTimeout = 5 * time.Second
+
+	skipPlaywrightBrowserInstallEnv = "SCRAPEMATE_SKIP_PLAYWRIGHT_BROWSER_INSTALL"
+)
 
 // closeWithTimeout runs closer in a background goroutine and returns when it
 // completes or when d elapses, whichever comes first. On timeout the goroutine
@@ -50,15 +55,18 @@ type JSFetcherOptions struct {
 	UserAgent          string
 }
 
-func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
-	opts := []*playwright.RunOptions{
+func playwrightRunOptions() []*playwright.RunOptions {
+	return []*playwright.RunOptions{
 		{
-			Browsers: []string{"chromium"},
-			Verbose:  true,
+			Browsers:            []string{"chromium"},
+			SkipInstallBrowsers: os.Getenv(skipPlaywrightBrowserInstallEnv) == "1",
+			Verbose:             true,
 		},
 	}
+}
 
-	if err := playwright.Install(opts...); err != nil {
+func New(params JSFetcherOptions) (scrapemate.HTTPFetcher, error) {
+	if err := playwright.Install(playwrightRunOptions()...); err != nil {
 		return nil, err
 	}
 
