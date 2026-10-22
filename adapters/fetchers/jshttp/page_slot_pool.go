@@ -100,11 +100,11 @@ func (p *pageSlotPool) close() {
 		slot.mu.Unlock()
 
 		if slot.ctx != nil {
-			_ = slot.ctx.Close()
+			closeWithTimeout(func() error { return slot.ctx.Close() }, browserCloseTimeout)
 		}
 
 		if slot.browser != nil {
-			_ = slot.browser.Close()
+			closeWithTimeout(func() error { return slot.browser.Close() }, browserCloseTimeout)
 		}
 	}
 }
