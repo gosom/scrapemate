@@ -1,6 +1,6 @@
 module github.com/gosom/scrapemate/examples/quotes-to-scrape-hooks
 
-go 1.27.1
+go 1.27.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
