@@ -3,6 +3,7 @@ package jshttp
 import (
 	"context"
 	"errors"
+	"runtime"
 	"time"
 
 	"github.com/mxschmitt/playwright-go"
@@ -289,36 +290,50 @@ func (o *browser) Close() {
 	_ = o.browser.Close()
 }
 
+// launchArgs returns the Chromium command line flags for the given GOOS.
+// --single-process is not passed on Windows, where current Chromium builds
+// exit on the first navigation ("Target page, context or browser has been
+// closed") when it is set.
+func launchArgs(goos string, disableImages bool) []string {
+	args := []string{
+		`--start-maximized`,
+		`--no-default-browser-check`,
+		`--disable-dev-shm-usage`,
+		`--no-sandbox`,
+		`--disable-setuid-sandbox`,
+		`--no-zygote`,
+		`--disable-gpu`,
+		`--mute-audio`,
+		`--disable-extensions`,
+		`--disable-breakpad`,
+		`--disable-features=TranslateUI,BlinkGenPropertyTrees`,
+		`--disable-ipc-flooding-protection`,
+		`--enable-features=NetworkService,NetworkServiceInProcess`,
+		"--enable-features=NetworkService",
+		`--disable-default-apps`,
+		`--disable-notifications`,
+		`--disable-webgl`,
+		`--disable-blink-features=AutomationControlled`,
+		"--ignore-certificate-errors",
+		"--ignore-certificate-errors-spki-list",
+		"--disable-web-security",
+	}
+
+	if goos != "windows" {
+		args = append(args, `--single-process`)
+	}
+
+	if disableImages {
+		args = append(args, `--blink-settings=imagesEnabled=false`)
+	}
+
+	return args
+}
+
 func newBrowser(pw *playwright.Playwright, headless, disableImages bool, proxyPool *ProxyPool, ua string) (*browser, error) {
 	opts := playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(headless),
-		Args: []string{
-			`--start-maximized`,
-			`--no-default-browser-check`,
-			`--disable-dev-shm-usage`,
-			`--no-sandbox`,
-			`--disable-setuid-sandbox`,
-			`--no-zygote`,
-			`--disable-gpu`,
-			`--mute-audio`,
-			`--disable-extensions`,
-			`--single-process`,
-			`--disable-breakpad`,
-			`--disable-features=TranslateUI,BlinkGenPropertyTrees`,
-			`--disable-ipc-flooding-protection`,
-			`--enable-features=NetworkService,NetworkServiceInProcess`,
-			"--enable-features=NetworkService",
-			`--disable-default-apps`,
-			`--disable-notifications`,
-			`--disable-webgl`,
-			`--disable-blink-features=AutomationControlled`,
-			"--ignore-certificate-errors",
-			"--ignore-certificate-errors-spki-list",
-			"--disable-web-security",
-		},
-	}
-	if disableImages {
-		opts.Args = append(opts.Args, `--blink-settings=imagesEnabled=false`)
+		Args:     launchArgs(runtime.GOOS, disableImages),
 	}
 
 	br, err := pw.Chromium.Launch(opts)
