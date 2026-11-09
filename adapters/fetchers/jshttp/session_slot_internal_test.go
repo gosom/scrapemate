@@ -3,6 +3,8 @@ package jshttp
 import (
 	"context"
 	"testing"
+
+	"github.com/mxschmitt/playwright-go"
 )
 
 func newJSFetchForTest(size int) (*jsFetch, *fakeRuntimeFactory) {
@@ -215,5 +217,24 @@ func TestSessionSlotRecreatesPageWhenPrimaryPageIsClosed(t *testing.T) {
 
 	if page1 == page2 {
 		t.Fatalf("expected closed page to be replaced")
+	}
+}
+
+type stubPlaywrightPage struct {
+	playwright.Page
+	closed bool
+}
+
+func (s stubPlaywrightPage) IsClosed() bool { return s.closed }
+
+func TestPlaywrightPageIsClosed(t *testing.T) {
+	open := &playwrightPage{p: stubPlaywrightPage{closed: false}}
+	if open.isClosed() {
+		t.Fatal("open page reported as closed")
+	}
+
+	closed := &playwrightPage{p: stubPlaywrightPage{closed: true}}
+	if !closed.isClosed() {
+		t.Fatal("closed page reported as open")
 	}
 }

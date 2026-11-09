@@ -213,7 +213,7 @@ type playwrightPage struct {
 }
 
 func (p *playwrightPage) isClosed() bool {
-	return !p.p.IsClosed()
+	return p.p.IsClosed()
 }
 
 func (p *playwrightPage) playwrightPage() playwright.Page {
