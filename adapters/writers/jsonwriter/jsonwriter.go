@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"reflect"
 
 	"github.com/gosom/scrapemate"
 )
@@ -34,10 +35,15 @@ func (c *jsonWriter) Run(_ context.Context, in <-chan scrapemate.Result) error {
 }
 
 func asSlice(t any) []any {
-	isSlice, ok := t.([]any)
-	if ok {
-		return isSlice
+	v := reflect.ValueOf(t)
+	if v.Kind() != reflect.Slice {
+		return []any{t}
 	}
 
-	return []any{t}
+	items := make([]any, v.Len())
+	for i := range items {
+		items[i] = v.Index(i).Interface()
+	}
+
+	return items
 }
