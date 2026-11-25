@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"time"
 
 	"github.com/gosom/scrapemate"
 	browseradapter "github.com/gosom/scrapemate/adapters/browsers/playwright"
@@ -17,12 +19,18 @@ import (
 // ErrSessionLost indicates that the browser lost the client's session.
 var ErrSessionLost = errors.New("scrape: browser session lost")
 
+type playwrightDriver interface {
+	Stop() error
+	Pid() int
+}
+
 type browserSession struct {
-	driver  *playwright.Playwright
+	driver  playwrightDriver
 	browser playwright.Browser
 	context playwright.BrowserContext
 	bridge  *jshttp.AuthProxy
 	opening chan struct{}
+	lost    bool
 }
 
 func newBrowserSession(endpoint *url.URL) (*browserSession, error) {
@@ -94,7 +102,7 @@ func (s *browserSession) configureProxy(endpoint *url.URL) (*playwright.Proxy, e
 }
 
 func (s *browserSession) fetch(ctx context.Context, target string, cfg fetchConfig) (*Result, error) {
-	if !s.browser.IsConnected() {
+	if s.sessionLost() {
 		return nil, ErrSessionLost
 	}
 
@@ -129,6 +137,158 @@ func (s *browserSession) fetch(ctx context.Context, target string, cfg fetchConf
 	}
 
 	return result, err
+}
+
+func (s *browserSession) clearCookies(ctx context.Context) error {
+	if s.sessionLost() {
+		return ErrSessionLost
+	}
+
+	// A canceled fetch can still have a tab opening in the background.
+	select {
+	case s.opening <- struct{}{}:
+		defer func() { <-s.opening }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Playwright commands do not take a Go context. After cancellation, keep
+	// this session unavailable and let Close stop the driver directly.
+	done := make(chan error, 1)
+	go func() { done <- s.clearBrowserCookies(ctx) }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			s.lost = true
+
+			return fmt.Errorf("%w: %w", ErrSessionLost, err)
+		}
+
+		return nil
+	case <-ctx.Done():
+		s.lost = true
+
+		return ctx.Err()
+	}
+}
+
+func (s *browserSession) clearBrowserCookies(ctx context.Context) (resultErr error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	cdp, err := s.browser.NewBrowserCDPSession()
+	if err != nil {
+		return fmt.Errorf("open Chromium protocol session: %w", err)
+	}
+	defer func() {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			resultErr = errors.Join(resultErr, ctxErr)
+
+			return
+		}
+
+		if detachErr := cdp.Detach(); detachErr != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("detach Chromium protocol session: %w", detachErr))
+		}
+	}()
+
+	if drainErr := drainBrowserTabs(ctx, cdp); drainErr != nil {
+		return drainErr
+	}
+
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+
+	if clearErr := s.context.ClearCookies(); clearErr != nil {
+		return fmt.Errorf("clear browser cookies: %w", clearErr)
+	}
+
+	return nil
+}
+
+func drainBrowserTabs(ctx context.Context, cdp playwright.CDPSession) error {
+	var failedTarget string
+
+	var closeErr error
+
+	for ctx.Err() == nil {
+		targets, err := browserTabTargets(cdp)
+		if err != nil {
+			return err
+		}
+
+		if len(targets) == 0 {
+			return nil
+		}
+
+		for _, target := range targets {
+			if target == failedTarget {
+				return fmt.Errorf("close Chromium tab: %w", closeErr)
+			}
+		}
+
+		// Chromium reports popups before Playwright finishes initializing
+		// them. Re-list targets after each close to find any late arrivals.
+		target := targets[0]
+
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if _, closeErr = cdp.Send("Target.closeTarget", map[string]any{"targetId": target}); closeErr != nil {
+			// The tab may have closed itself since the previous listing.
+			failedTarget = target
+		}
+	}
+
+	return ctx.Err()
+}
+
+func browserTabTargets(cdp playwright.CDPSession) ([]string, error) {
+	result, err := cdp.Send("Target.getTargets", map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("list Chromium tabs: %w", err)
+	}
+
+	response, ok := result.(map[string]any)
+
+	infos, listOK := response["targetInfos"].([]any)
+	if !ok || !listOK {
+		return nil, errors.New("invalid Chromium target list")
+	}
+
+	// The client owns a dedicated Chromium instance with one context.
+	tabs := make([]string, 0, len(infos))
+	for _, info := range infos {
+		target, valid := info.(map[string]any)
+		if !valid {
+			return nil, errors.New("invalid Chromium target")
+		}
+
+		if target["type"] != "page" {
+			continue
+		}
+
+		id, valid := target["targetId"].(string)
+		if !valid || id == "" {
+			return nil, errors.New("missing Chromium tab ID")
+		}
+
+		tabs = append(tabs, id)
+	}
+
+	return tabs, nil
+}
+
+func (s *browserSession) sessionLost() bool {
+	return s.lost || !s.browser.IsConnected() || s.context.IsClosed()
 }
 
 // Keep at most one pending NewPage command. The unbuffered result transfers
@@ -235,19 +395,57 @@ func readPage(page playwright.Page, target string, cfg fetchConfig) (*Result, er
 func (s *browserSession) close() error {
 	var errs []error
 
-	if s.context != nil {
-		errs = append(errs, s.context.Close())
-	}
+	if s.lost {
+		errs = append(errs, stopUnresponsiveDriver(s.driver))
+	} else {
+		if s.context != nil {
+			errs = append(errs, s.context.Close())
+		}
 
-	if s.browser != nil {
-		errs = append(errs, s.browser.Close())
-	}
+		if s.browser != nil {
+			errs = append(errs, s.browser.Close())
+		}
 
-	errs = append(errs, s.driver.Stop())
+		errs = append(errs, s.driver.Stop())
+	}
 
 	if s.bridge != nil {
 		errs = append(errs, s.bridge.Close())
 	}
 
 	return errors.Join(errs...)
+}
+
+func stopUnresponsiveDriver(driver playwrightDriver) error {
+	var process *os.Process
+
+	var lookupErr error
+	if pid := driver.Pid(); pid > 0 {
+		process, lookupErr = os.FindProcess(pid)
+		if process != nil {
+			defer func() {
+				// The Playwright driver reaps its process through Stop.
+				_ = process.Release()
+			}()
+		}
+	}
+
+	stopped := make(chan error, 1)
+	go func() { stopped <- driver.Stop() }()
+
+	select {
+	case err := <-stopped:
+		return err
+	case <-time.After(5 * time.Second):
+		timeoutErr := errors.New("stop Playwright driver: timed out")
+		if process == nil {
+			return errors.Join(timeoutErr, lookupErr)
+		}
+
+		if err := process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			return errors.Join(timeoutErr, err)
+		}
+
+		return timeoutErr
+	}
 }

@@ -122,6 +122,7 @@ func WaitFor(selector string) FetchOption {
 
 type session interface {
 	fetch(context.Context, string, fetchConfig) (*Result, error)
+	clearCookies(context.Context) error
 	close() error
 }
 
@@ -199,16 +200,10 @@ func (c *Client) Fetch(ctx context.Context, target string, opts ...FetchOption) 
 	stop := context.AfterFunc(c.life, cancel)
 	defer stop()
 
-	select {
-	case c.gate <- struct{}{}:
-		defer func() { <-c.gate }()
-	case <-ctx.Done():
-		return nil, c.fetchError(ctx.Err())
+	if err = c.acquire(ctx); err != nil {
+		return nil, c.fetchError(err)
 	}
-
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return nil, c.fetchError(ctxErr)
-	}
+	defer func() { <-c.gate }()
 
 	started := time.Now()
 	result, err := c.session.fetch(ctx, target, cfg)
@@ -222,6 +217,63 @@ func (c *Client) Fetch(ctx context.Context, target string, opts ...FetchOption) 
 	}
 
 	return result, nil
+}
+
+// ClearCookies removes all cookies from the client's session across all hosts.
+// It leaves the proxy and browser local storage in place. It waits for the
+// current fetch to finish. If ctx expires during a browser command, the
+// browser session becomes unusable and future fetches and clears return ErrSessionLost.
+// Sites can set fresh cookies through subsequent requests, including requests
+// from browser service workers.
+func (c *Client) ClearCookies(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	stop := context.AfterFunc(c.life, cancel)
+	defer stop()
+
+	if err := c.acquire(ctx); err != nil {
+		return c.clearCookiesError(err)
+	}
+	defer func() { <-c.gate }()
+
+	if err := c.session.clearCookies(ctx); err != nil {
+		return c.clearCookiesError(err)
+	}
+
+	return nil
+}
+
+func (c *Client) acquire(ctx context.Context) error {
+	select {
+	case c.gate <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.life.Done():
+		return ErrClosed
+	}
+
+	if c.life.Err() != nil {
+		<-c.gate
+
+		return ErrClosed
+	}
+
+	if err := ctx.Err(); err != nil {
+		<-c.gate
+
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) clearCookiesError(err error) error {
+	if c.life.Err() != nil {
+		return ErrClosed
+	}
+
+	return fmt.Errorf("scrape: clear cookies: %w", err)
 }
 
 func (c *Client) validateFetch(target string, opts []FetchOption) (fetchConfig, error) {
@@ -269,8 +321,8 @@ func (c *Client) Close() error {
 }
 
 type httpSession struct {
-	fetcher   scrapemate.HTTPFetcher
-	transport *http.Transport
+	fetcher scrapemate.HTTPFetcher
+	client  *http.Client
 }
 
 func newHTTPSession(endpoint *url.URL) (*httpSession, error) {
@@ -290,10 +342,9 @@ func newHTTPSession(endpoint *url.URL) (*httpSession, error) {
 		transport.Proxy = http.ProxyURL(endpoint)
 	}
 
-	return &httpSession{
-		fetcher:   nethttp.New(&http.Client{Jar: jar, Transport: transport}),
-		transport: transport,
-	}, nil
+	client := &http.Client{Jar: jar, Transport: transport}
+
+	return &httpSession{fetcher: nethttp.New(client), client: client}, nil
 }
 
 func (s *httpSession) fetch(ctx context.Context, target string, _ fetchConfig) (*Result, error) {
@@ -305,8 +356,24 @@ func (s *httpSession) fetch(ctx context.Context, target string, _ fetchConfig) (
 	return &Result{Response: resp}, resp.Error
 }
 
+func (s *httpSession) clearCookies(ctx context.Context) error {
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		return fmt.Errorf("create cookie jar: %w", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// The client gate excludes HTTP requests while swapping the jar.
+	s.client.Jar = jar
+
+	return nil
+}
+
 func (s *httpSession) close() error {
-	s.transport.CloseIdleConnections()
+	s.client.CloseIdleConnections()
 
 	return s.fetcher.Close()
 }
