@@ -109,12 +109,29 @@ document.querySelector("#preference").textContent = localStorage.getItem("prefer
 	require.ErrorIs(t, client.ClearCookies(t.Context()), scrape.ErrClosed)
 }
 
-func TestClearCookiesClosesNavigatingPopup(t *testing.T) {
+func TestSessionChangeClosesNavigatingPopup(t *testing.T) {
 	t.Parallel()
 
 	if os.Getenv("SCRAPEMATE_TEST_BROWSER") == "" {
 		t.Skip("set SCRAPEMATE_TEST_BROWSER=1 with Playwright and Chromium installed")
 	}
+
+	for _, tc := range []struct {
+		name   string
+		change func(*scrape.Client, context.Context) error
+	}{
+		{name: "clear cookies", change: (*scrape.Client).ClearCookies},
+		{name: "reset session", change: (*scrape.Client).ResetSession},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testSessionChangeClosesNavigatingPopup(t, tc.change)
+		})
+	}
+}
+
+func testSessionChangeClosesNavigatingPopup(t *testing.T, change func(*scrape.Client, context.Context) error) {
+	t.Helper()
 
 	started := make(chan struct{})
 	canceled := make(chan struct{})
@@ -148,17 +165,34 @@ func TestClearCookiesClosesNavigatingPopup(t *testing.T) {
 		t.Fatal("popup navigation did not reach the server")
 	}
 
-	require.NoError(t, client.ClearCookies(ctx))
+	require.NoError(t, change(client, ctx))
 
 	select {
 	case <-canceled:
 	case <-ctx.Done():
-		t.Fatal("popup navigation survived cookie clearing")
+		t.Fatal("popup navigation survived the session change")
 	}
 }
 
-func TestClearCookiesWhileFetching(t *testing.T) {
+func TestSessionChangesWhileFetching(t *testing.T) {
 	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		change func(*scrape.Client, context.Context) error
+	}{
+		{name: "clear cookies", change: (*scrape.Client).ClearCookies},
+		{name: "reset session", change: (*scrape.Client).ResetSession},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testSessionChangeWhileFetching(t, tc.change)
+		})
+	}
+}
+
+func testSessionChangeWhileFetching(t *testing.T, change func(*scrape.Client, context.Context) error) {
+	t.Helper()
 
 	started := make(chan struct{})
 	reply := make(chan struct{})
@@ -207,20 +241,20 @@ func TestClearCookiesWhileFetching(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 
-	require.ErrorIs(t, client.ClearCookies(ctx), context.DeadlineExceeded)
+	require.ErrorIs(t, change(client, ctx), context.DeadlineExceeded)
 
-	cleared := make(chan error, 1)
-	go func() { cleared <- client.ClearCookies(t.Context()) }()
+	changed := make(chan error, 1)
+	go func() { changed <- change(client, t.Context()) }()
 
 	select {
-	case clearErr := <-cleared:
-		t.Fatalf("clear returned before the fetch finished: %v", clearErr)
+	case changeErr := <-changed:
+		t.Fatalf("session change returned before the fetch finished: %v", changeErr)
 	case <-time.After(50 * time.Millisecond):
 	}
 
 	close(reply)
 	require.NoError(t, <-fetched)
-	require.NoError(t, <-cleared)
+	require.NoError(t, <-changed)
 
 	page, err := client.Fetch(t.Context(), server.URL+"/inspect")
 	require.NoError(t, err)

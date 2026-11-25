@@ -33,7 +33,7 @@ type browserSession struct {
 	lost    bool
 }
 
-func newBrowserSession(endpoint *url.URL) (*browserSession, error) {
+func newBrowserSession(ctx context.Context, endpoint *url.URL) (*browserSession, error) {
 	driver, err := playwright.Run(&playwright.RunOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("scrape: start Playwright (install the matching driver and Chromium first): %w", err)
@@ -41,25 +41,41 @@ func newBrowserSession(endpoint *url.URL) (*browserSession, error) {
 
 	s := &browserSession{driver: driver, opening: make(chan struct{}, 1)}
 
-	proxy, err := s.configureProxy(endpoint)
-	if err != nil {
-		return nil, errors.Join(err, s.close())
+	stopped := make(chan error, 1)
+	stop := context.AfterFunc(ctx, func() { stopped <- stopUnresponsiveDriver(driver) })
+
+	err = s.launch(driver.Chromium, endpoint)
+	if !stop() {
+		return nil, errors.Join(ctx.Err(), <-stopped, s.closeProxy())
 	}
 
-	s.browser, err = driver.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
+	if err != nil {
+		return nil, errors.Join(err, s.discard())
+	}
+
+	return s, nil
+}
+
+func (s *browserSession) launch(chromium playwright.BrowserType, endpoint *url.URL) error {
+	proxy, err := s.configureProxy(endpoint)
+	if err != nil {
+		return err
+	}
+
+	s.browser, err = chromium.Launch(playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(true),
 		Proxy:    proxy,
 	})
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("scrape: launch Chromium: %w", err), s.close())
+		return fmt.Errorf("scrape: launch Chromium: %w", err)
 	}
 
 	s.context, err = s.browser.NewContext()
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("scrape: create browser session: %w", err), s.close())
+		return fmt.Errorf("scrape: create browser session: %w", err)
 	}
 
-	return s, nil
+	return nil
 }
 
 func (s *browserSession) configureProxy(endpoint *url.URL) (*playwright.Proxy, error) {
@@ -393,27 +409,25 @@ func readPage(page playwright.Page, target string, cfg fetchConfig) (*Result, er
 }
 
 func (s *browserSession) close() error {
-	var errs []error
-
 	if s.lost {
-		errs = append(errs, stopUnresponsiveDriver(s.driver))
-	} else {
-		if s.context != nil {
-			errs = append(errs, s.context.Close())
-		}
-
-		if s.browser != nil {
-			errs = append(errs, s.browser.Close())
-		}
-
-		errs = append(errs, s.driver.Stop())
+		return s.discard()
 	}
 
+	return errors.Join(s.context.Close(), s.browser.Close(), s.driver.Stop(), s.closeProxy())
+}
+
+func (s *browserSession) discard() error {
+	// A retired session has its own driver. Closing the pipe stops all of
+	// its browser activity, even if context or page commands are stalled.
+	return errors.Join(stopUnresponsiveDriver(s.driver), s.closeProxy())
+}
+
+func (s *browserSession) closeProxy() error {
 	if s.bridge != nil {
-		errs = append(errs, s.bridge.Close())
+		return s.bridge.Close()
 	}
 
-	return errors.Join(errs...)
+	return nil
 }
 
 func stopUnresponsiveDriver(driver playwrightDriver) error {
