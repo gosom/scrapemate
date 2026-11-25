@@ -96,8 +96,9 @@ func WithTimeout(timeout time.Duration) Option {
 	}
 }
 
-// WithProxies supplies proxy endpoints. When a list is provided, clients
-// select successive endpoints and keep their selected endpoint for their lifetime.
+// WithProxies supplies proxy endpoints. New clients select successive endpoints
+// from the list. ResetSession advances the client's selection, and fetches keep
+// using the selected endpoint between resets.
 func WithProxies(proxies []string) Option {
 	return func(cfg *clientConfig) error {
 		cfg.proxies = append([]string(nil), proxies...)
@@ -124,19 +125,24 @@ type session interface {
 	fetch(context.Context, string, fetchConfig) (*Result, error)
 	clearCookies(context.Context) error
 	close() error
+	discard() error
 }
 
 // Client owns a private cookie session. It is safe for concurrent use and
 // admits one fetch at a time. Create a client with New.
 type Client struct {
-	session  session
-	timeout  time.Duration
-	js       bool
-	gate     chan struct{}
-	life     context.Context
-	cancel   context.CancelFunc
-	once     sync.Once
-	closeErr error
+	session    session
+	newSession func(context.Context, *url.URL) (session, error)
+	proxies    []*url.URL
+	proxyIndex uint64
+	timeout    time.Duration
+	js         bool
+	gate       chan struct{}
+	replacing  chan struct{}
+	life       context.Context
+	cancel     context.CancelFunc
+	once       sync.Once
+	closeErr   error
 }
 
 var nextProxy atomic.Uint64
@@ -151,18 +157,28 @@ func New(opts ...Option) (*Client, error) {
 		}
 	}
 
-	endpoint, err := selectProxy(cfg.proxies)
+	proxies, err := parseProxies(cfg.proxies)
 	if err != nil {
 		return nil, err
 	}
 
-	var backend session
-	if cfg.js {
-		backend, err = newBrowserSession(endpoint)
-	} else {
-		backend, err = newHTTPSession(endpoint)
+	newSession := func(ctx context.Context, endpoint *url.URL) (session, error) {
+		if cfg.js {
+			return newBrowserSession(ctx, endpoint)
+		}
+
+		return newHTTPSession(endpoint)
 	}
 
+	var endpoint *url.URL
+
+	var proxyIndex uint64
+	if len(proxies) > 0 {
+		proxyIndex = (nextProxy.Add(1) - 1) % uint64(len(proxies))
+		endpoint = proxies[proxyIndex]
+	}
+
+	backend, err := newSession(context.Background(), endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -170,12 +186,16 @@ func New(opts ...Option) (*Client, error) {
 	life, cancel := context.WithCancel(context.Background())
 
 	return &Client{
-		session: backend,
-		timeout: cfg.timeout,
-		js:      cfg.js,
-		gate:    make(chan struct{}, 1),
-		life:    life,
-		cancel:  cancel,
+		session:    backend,
+		newSession: newSession,
+		proxies:    proxies,
+		proxyIndex: proxyIndex,
+		timeout:    cfg.timeout,
+		js:         cfg.js,
+		gate:       make(chan struct{}, 1),
+		replacing:  make(chan struct{}, 1),
+		life:       life,
+		cancel:     cancel,
 	}, nil
 }
 
@@ -222,7 +242,8 @@ func (c *Client) Fetch(ctx context.Context, target string, opts ...FetchOption) 
 // ClearCookies removes all cookies from the client's session across all hosts.
 // It leaves the proxy and browser local storage in place. It waits for the
 // current fetch to finish. If ctx expires during a browser command, the
-// browser session becomes unusable and future fetches and clears return ErrSessionLost.
+// browser session becomes unusable and fetches and clears return ErrSessionLost
+// until the session is reset.
 // Sites can set fresh cookies through subsequent requests, including requests
 // from browser service workers.
 func (c *Client) ClearCookies(ctx context.Context) error {
@@ -242,6 +263,121 @@ func (c *Client) ClearCookies(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// ResetSession replaces the client's session. It starts with a fresh cookie
+// jar in HTTP mode or fresh browser storage in JavaScript mode, and selects
+// the next configured proxy. It waits for any active fetch before replacing
+// the session, and can recover a lost browser session.
+//
+// Cancellation before replacement leaves the previous session in place.
+// If cancellation or a cleanup error occurs while closing the previous
+// session, the new session remains active.
+func (c *Client) ResetSession(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	stop := context.AfterFunc(c.life, cancel)
+	defer stop()
+
+	err := c.resetSession(ctx)
+	if err == nil {
+		return nil
+	}
+
+	if c.life.Err() != nil {
+		return ErrClosed
+	}
+
+	return fmt.Errorf("scrape: reset session: %w", err)
+}
+
+func (c *Client) resetSession(ctx context.Context) error {
+	if err := c.acquire(ctx); err != nil {
+		return err
+	}
+	defer func() { <-c.gate }()
+
+	// A canceled reset can still be unwinding a Playwright call. Allow only
+	// one replacement to own resources at a time.
+	select {
+	case c.replacing <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	if err := ctx.Err(); err != nil {
+		<-c.replacing
+
+		return err
+	}
+
+	var endpoint *url.URL
+
+	proxyIndex := c.proxyIndex
+	if len(c.proxies) > 0 {
+		proxyIndex = (proxyIndex + 1) % uint64(len(c.proxies))
+		endpoint = c.proxies[proxyIndex]
+	}
+
+	type replacement struct {
+		session session
+		err     error
+	}
+
+	ready := make(chan replacement)
+	discard := make(chan session, 1)
+	cleaned := make(chan error, 1)
+
+	go func() {
+		defer func() { <-c.replacing }()
+
+		fresh, err := c.newSession(ctx, endpoint)
+		select {
+		case ready <- replacement{session: fresh, err: err}:
+			if err == nil {
+				cleaned <- (<-discard).discard()
+			}
+		case <-ctx.Done():
+			if err == nil {
+				// A canceled caller can no longer take ownership.
+				cleaned <- fresh.discard()
+			}
+		}
+	}()
+
+	select {
+	case result := <-ready:
+		if result.err != nil {
+			return result.err
+		}
+
+		if err := ctx.Err(); err != nil {
+			discard <- result.session
+
+			return err
+		}
+
+		previous := c.session
+
+		c.session = result.session
+		c.proxyIndex = proxyIndex
+
+		discard <- previous
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	select {
+	case err := <-cleaned:
+		if err != nil {
+			return fmt.Errorf("discard previous session: %w", err)
+		}
+
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (c *Client) acquire(ctx context.Context) error {
@@ -305,8 +441,8 @@ func (c *Client) fetchError(err error) error {
 	return fmt.Errorf("scrape: fetch: %w", err)
 }
 
-// Close cancels active and waiting fetches and releases the session. Calling
-// Close again returns the same result.
+// Close cancels active and waiting operations and releases the current
+// session. Calling Close again returns the same result.
 func (c *Client) Close() error {
 	c.once.Do(func() {
 		c.cancel()
@@ -378,11 +514,11 @@ func (s *httpSession) close() error {
 	return s.fetcher.Close()
 }
 
-func selectProxy(endpoints []string) (*url.URL, error) {
-	if len(endpoints) == 0 {
-		return nil, nil
-	}
+func (s *httpSession) discard() error {
+	return s.close()
+}
 
+func parseProxies(endpoints []string) ([]*url.URL, error) {
 	proxies := make([]*url.URL, 0, len(endpoints))
 	for i, endpoint := range endpoints {
 		if !strings.Contains(endpoint, "://") {
@@ -401,5 +537,5 @@ func selectProxy(endpoints []string) (*url.URL, error) {
 		proxies = append(proxies, parsed)
 	}
 
-	return proxies[(nextProxy.Add(1)-1)%uint64(len(proxies))], nil
+	return proxies, nil
 }
