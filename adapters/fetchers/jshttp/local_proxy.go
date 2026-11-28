@@ -109,6 +109,15 @@ func createSOCKS5ProxyClient(upstream *url.URL, auth *proxy.Auth) *http.Client {
 
 // StartAuthProxy starts an HTTP proxy that authenticates against an upstream proxy (HTTP or SOCKS5)
 func StartAuthProxy(proxyURL, username, password string) (*AuthProxy, error) {
+	return startAuthProxy(proxyURL, username, password, false)
+}
+
+// StartAuthProxyPreservingRedirects forwards redirect responses to the downstream client.
+func StartAuthProxyPreservingRedirects(proxyURL, username, password string) (*AuthProxy, error) {
+	return startAuthProxy(proxyURL, username, password, true)
+}
+
+func startAuthProxy(proxyURL, username, password string, preserveRedirects bool) (*AuthProxy, error) {
 	if proxyURL == "" {
 		return nil, fmt.Errorf("proxy URL cannot be empty")
 	}
@@ -157,6 +166,12 @@ func StartAuthProxy(proxyURL, username, password string) (*AuthProxy, error) {
 		authProxy.client = createSOCKS5ProxyClient(&upstream, authProxy.socks5Auth)
 	} else {
 		authProxy.client = createHTTPProxyClient(&upstream)
+	}
+
+	if preserveRedirects {
+		authProxy.client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
 	}
 
 	authProxy.bufferPool = sync.Pool{

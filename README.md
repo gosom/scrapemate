@@ -54,7 +54,45 @@ go run . -js
 go get github.com/gosom/scrapemate
 ```
 
-## Quickstart
+## Fetch a single page
+
+Use `github.com/gosom/scrapemate/scrape` to fetch a URL and get the response directly.
+
+```go
+client, err := scrape.New()
+if err != nil {
+    return err
+}
+defer client.Close()
+
+page, err := client.Fetch(ctx, "https://example.com")
+if err != nil {
+    return err
+}
+fmt.Println(page.Response.StatusCode, page.Response.URL)
+fmt.Println(page.HTML())
+```
+
+Reuse the client across calls to keep its cookie session. Pass `scrape.WithProxies(proxies)` to select a proxy for the lifetime of the client. HTTP error statuses such as 404 are available in `page.Response` along with the response body.
+
+Run the [single-page example](examples/scrape-client/main.go) from the repository root to fetch a page over HTTP.
+
+```sh
+go run ./examples/scrape-client https://example.com
+```
+
+For JavaScript pages, install Chromium and the matching Playwright driver, then use `-js`. The optional `-wait` flag tells the client to wait for a visible CSS selector before capturing the rendered HTML.
+
+```sh
+go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps chromium
+go run ./examples/scrape-client -js -wait 'h1' https://example.com
+```
+
+Set `SCRAPEMATE_PROXY` to a proxy URL to use it with either example command.
+
+Use HTTP mode to fetch attachments. If Chromium treats a response as a download, JavaScript mode returns a navigation error.
+
+## Job-based quickstart
 
 
 ```go
