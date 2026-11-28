@@ -3,11 +3,13 @@ module github.com/gosom/scrapemate
 go 1.27.3
 
 require (
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
 	github.com/Noooste/azuretls-client v1.13.2
 	github.com/PuerkitoBio/goquery v1.14.0
 	github.com/go-playground/validator/v10 v10.30.6
 	github.com/gosom/kit v0.0.0-20230309082109-543b32ac686a
 	github.com/mxschmitt/playwright-go v0.6401.0
+	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/mock v0.6.0
@@ -34,6 +36,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/ClickHouse/clickhouse-go-linter v1.2.1 // indirect
 	github.com/Djarvur/go-err113 v0.1.1 // indirect
+	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/MirrexOne/unqueryvet v1.5.4 // indirect
 	github.com/Noooste/fhttp v1.0.15 // indirect
@@ -204,7 +207,6 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
-	github.com/spf13/pflag v1.1.0 // indirect
 	github.com/spf13/viper v1.21.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
 	github.com/stbenjam/no-sprintf-host-port v0.3.1 // indirect

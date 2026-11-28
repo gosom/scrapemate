@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scrapemate fetch URL` writes Markdown or full HTML from an HTTP response or rendered Chromium page. Go callers can request the same Markdown with `scrape.WithOutputs(scrape.Markdown())`. Tagged releases include CLI binaries for Linux, macOS and Windows on amd64 and arm64.
 - `RequestHookProvider` — optional capability interface for `BrowserPage`
   implementations that can intercept outgoing requests and responses. Consumers
   opt in via a type assertion (`if hook, ok := page.(scrapemate.RequestHookProvider); ok { ... }`),

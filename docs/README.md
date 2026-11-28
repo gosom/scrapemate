@@ -5,6 +5,15 @@
 
 Scrapemate is a web crawling and scraping framework written in Golang. It is designed to be simple and easy to use, yet powerful enough to handle complex scraping tasks.
 
+## Read a page as Markdown
+
+With the CLI on your path, fetch a page directly. HTTP mode needs no browser or API key.
+
+```sh
+scrapemate fetch https://example.com --format markdown
+```
+
+To try it from this checkout, run `go run ./cmd/scrapemate fetch https://example.com`. For prebuilt binaries, JavaScript rendering, and the matching Go example, see the [fetch guide](fetch.md).
 
 ## Features
 
