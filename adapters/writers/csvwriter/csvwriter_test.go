@@ -20,9 +20,12 @@ func (i item) CsvRow() []string     { return []string{i.name} }
 // A job that only yields next jobs sends a result with no data.
 func TestRunSkipsResultsWithoutData(t *testing.T) {
 	var buf bytes.Buffer
+
 	in := make(chan scrapemate.Result, 2)
 	in <- scrapemate.Result{Data: nil}
+
 	in <- scrapemate.Result{Data: item{name: "a"}}
+
 	close(in)
 
 	err := csvwriter.NewCsvWriter(csv.NewWriter(&buf)).Run(context.Background(), in)
