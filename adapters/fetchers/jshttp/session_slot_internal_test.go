@@ -2,6 +2,7 @@ package jshttp
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -215,5 +216,58 @@ func TestSessionSlotRecreatesPageWhenPrimaryPageIsClosed(t *testing.T) {
 
 	if page1 == page2 {
 		t.Fatalf("expected closed page to be replaced")
+	}
+}
+
+// brokenPageRuntime cannot recreate pages or contexts, which forces
+// acquirePage to fall back to recreating the whole browser.
+type brokenPageRuntime struct {
+	*fakeRuntime
+	browserErr error
+}
+
+func (r *brokenPageRuntime) recreatePage() error { return errors.New("page closed") }
+
+func (r *brokenPageRuntime) recreateContext() error { return errors.New("context closed") }
+
+func (r *brokenPageRuntime) recreateBrowser() error {
+	if r.browserErr != nil {
+		return r.browserErr
+	}
+
+	return r.fakeRuntime.recreateBrowser()
+}
+
+func TestSessionSlotReturnsPageAfterBrowserRecreation(t *testing.T) {
+	t.Parallel()
+
+	slot := &sessionSlot{runtime: &brokenPageRuntime{fakeRuntime: &fakeRuntime{nextPageID: 1}}}
+
+	p, err := slot.acquirePage(context.Background())
+	if err != nil {
+		t.Fatalf("acquirePage returned error: %v", err)
+	}
+
+	if p == nil {
+		t.Fatalf("expected a page after browser recreation, got nil")
+	}
+}
+
+func TestSessionSlotReturnsErrorWhenBrowserRecreationFails(t *testing.T) {
+	t.Parallel()
+
+	errBrowser := errors.New("browser launch failed")
+	slot := &sessionSlot{runtime: &brokenPageRuntime{
+		fakeRuntime: &fakeRuntime{nextPageID: 1},
+		browserErr:  errBrowser,
+	}}
+
+	p, err := slot.acquirePage(context.Background())
+	if !errors.Is(err, errBrowser) {
+		t.Fatalf("expected %v, got %v", errBrowser, err)
+	}
+
+	if p != nil {
+		t.Fatalf("expected no page when browser recreation fails, got %v", p)
 	}
 }
