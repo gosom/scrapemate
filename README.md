@@ -16,6 +16,14 @@ scrapemate fetch https://example.com --format markdown
 
 To try it from this checkout, run `go run ./cmd/scrapemate fetch https://example.com`. For prebuilt binaries, JavaScript rendering, and the matching Go example, see the [fetch guide](docs/fetch.md). Coding agents can use the [Scrapemate skill](skills/scrapemate/SKILL.md).
 
+## Featured sponsor
+
+<a href="https://www.webshare.io/?referral_code=0q3l81eet8mp">
+  <img src="./img/webshare-mapsscraper-banner.png" alt="Webshare proxy offer — 20% off your first purchase with MAPSSCRAPER20" width="600">
+</a>
+
+Scrapemate works with a direct connection. If you need a proxy, you can try Webshare through our [sponsor referral link](https://www.webshare.io/?referral_code=0q3l81eet8mp). Use `MAPSSCRAPER20` for 20% off your first purchase.
+
 ## Features
 
 - Low level API & Easy High Level API
@@ -258,6 +266,12 @@ See an example of how you can use `scrapemate` go scrape Google Maps: https://gi
 ## Contributing
 
 Contributions are welcome.
+
+## Responsible use and sponsor disclaimer
+
+Scrapemate is built for legitimate crawling and data collection. You are responsible for how you use it and for complying with applicable laws and the terms of the sites you access.
+
+Sponsors operate their services independently. If you use a sponsor, you deal directly with that provider under its own terms. The maintainer disclaims responsibility for sponsors’ products, services, claims, or any losses arising from their use.
 
 ## Licence
 

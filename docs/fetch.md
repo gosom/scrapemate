@@ -52,6 +52,8 @@ Each CLI invocation owns a fresh session.
 
 ## Use an authenticated proxy
 
+If you need a proxy for this example, you can try Webshare through the [sponsor referral link](https://www.webshare.io/?referral_code=0q3l81eet8mp). An existing proxy works too.
+
 Set `SCRAPEMATE_PROXY` in your shell for both HTTP and browser fetches. Replace the example credentials, host, and port with your provider’s values. A trailing `/` is optional, so you can copy the proxy URL directly from your provider’s curl example.
 
 ```sh
