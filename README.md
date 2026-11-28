@@ -97,7 +97,7 @@ go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps chr
 go run ./examples/scrape-client -js -wait 'h1' https://example.com
 ```
 
-Set `SCRAPEMATE_PROXY` to a proxy URL to use it with either example command.
+Set `SCRAPEMATE_PROXY` to a proxy URL to use it with either example command. See [Use an authenticated proxy](docs/fetch.md#use-an-authenticated-proxy) for an example and an outgoing-IP check.
 
 Use HTTP mode to fetch attachments. If Chromium treats a response as a download, JavaScript mode returns a navigation error.
 

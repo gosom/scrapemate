@@ -1,5 +1,7 @@
 ## Proxy Support
 
+For the CLI, see [Use an authenticated proxy](fetch.md#use-an-authenticated-proxy) for the environment variable and an outgoing-IP check.
+
 Scrapemate has builtin proxy support. 
 You can add your proxies and each request will be fetched via the proxy.
 
@@ -12,7 +14,7 @@ example:
 ```go
 proxies := []string{
 	 "socks5://localhost:9050",
-	 "http://user:pass@localhost:9051,
+	 "http://user:pass@localhost:9051",
 }
 
 cfg, err := scrapemateapp.NewConfig(

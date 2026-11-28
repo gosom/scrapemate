@@ -48,7 +48,26 @@ go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps chr
 scrapemate fetch https://quotes.toscrape.com/js/ --js --wait .quote
 ```
 
-Set `SCRAPEMATE_PROXY` to use a proxy with either mode. Each CLI invocation owns a fresh session.
+Each CLI invocation owns a fresh session.
+
+## Use an authenticated proxy
+
+Set `SCRAPEMATE_PROXY` in your shell for both HTTP and browser fetches. Replace the example credentials, host, and port with your provider’s values. Omit the trailing `/` after the host or port, even if it appears in your provider’s curl example.
+
+```sh
+export SCRAPEMATE_PROXY='http://USERNAME:PASSWORD@proxy.example:8080'
+scrapemate fetch https://example.com
+```
+
+From the repository root, you can run the same command with `go run ./cmd/scrapemate fetch https://example.com`.
+
+To verify the outgoing IP, keep the variable set and run the bundled Go example from the repository root. It writes the plain-text IP to stdout and the HTTP status to stderr. Compare the IP with the exit IP listed by your proxy provider.
+
+```sh
+go run ./examples/scrape-client https://ipv4.webshare.io/
+```
+
+Run `unset SCRAPEMATE_PROXY` when you’re done using the proxy.
 
 ## Fetch from Go
 
