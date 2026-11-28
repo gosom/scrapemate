@@ -5,7 +5,7 @@ description: Read a web page as Markdown or HTML using the local Scrapemate CLI,
 
 # Read a page with Scrapemate
 
-Run `scrapemate fetch URL` for readable Markdown. For a long page, redirect stdout to a file and read the saved snapshot in chunks. Use `--format html` when you need source markup or navigation links.
+Run `scrapemate fetch URL` for readable Markdown. For a long page, redirect stdout to a file and read the saved snapshot in chunks. Use `--format html` for the full HTML document and `--format raw` for the original response body, including JSON, plain text, or binary data.
 
 If content is populated by JavaScript, use `scrapemate fetch URL --js --wait 'selector'` with a selector for the desired content. Browser mode requires the matching Playwright driver and Chromium. The [fetch guide](https://github.com/gosom/scrapemate/blob/main/docs/fetch.md) covers binary installation and browser setup.
 

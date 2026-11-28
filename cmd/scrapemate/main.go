@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	usage          = "Usage: scrapemate fetch URL [--format markdown|html] [--js] [--wait SELECTOR] [--timeout DURATION]"
+	usage          = "Usage: scrapemate fetch URL [--format markdown|html|raw] [--js] [--wait SELECTOR] [--timeout DURATION]"
 	formatMarkdown = "markdown"
 	formatHTML     = "html"
+	formatRaw      = "raw"
 )
 
 func main() {
@@ -65,7 +66,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		flags.PrintDefaults()
 		fmt.Fprintln(stdout, "\nEnvironment:\n  SCRAPEMATE_PROXY    Proxy URL for HTTP and browser fetches (e.g. http://user:pass@host:port/)")
 	}
-	flags.StringVar(&cmd.format, "format", formatMarkdown, "output format (markdown or html)")
+	flags.StringVar(&cmd.format, "format", formatMarkdown, "output format (markdown, html, or raw response body)")
 	flags.BoolVar(&cmd.js, "js", false, "render with an installed Playwright Chromium browser")
 	flags.StringVar(&cmd.wait, "wait", "", "wait for a visible CSS selector with --js")
 	flags.DurationVar(&cmd.timeout, "timeout", 30*time.Second, "time budget for fetching the page")
@@ -99,8 +100,8 @@ func (cmd fetchCommand) validate(flags *pflag.FlagSet) error {
 	switch {
 	case flags.NArg() != 1:
 		return fmt.Errorf("expected one URL\n%s", usage)
-	case cmd.format != formatMarkdown && cmd.format != formatHTML:
-		return fmt.Errorf("unknown format %q (use markdown or html)", cmd.format)
+	case cmd.format != formatMarkdown && cmd.format != formatHTML && cmd.format != formatRaw:
+		return fmt.Errorf("unknown format %q (use markdown, html, or raw)", cmd.format)
 	case cmd.timeout <= 0:
 		return errors.New("--timeout must be positive")
 	case flags.Changed("wait") && (!cmd.js || strings.TrimSpace(cmd.wait) == ""):
@@ -160,6 +161,12 @@ func (cmd fetchCommand) writePage(stdout io.Writer, page *scrape.Result) error {
 		}
 
 		_, err := stdout.Write(doc.Data)
+
+		return err
+	}
+
+	if cmd.format == formatRaw {
+		_, err := stdout.Write(page.Response.Body)
 
 		return err
 	}

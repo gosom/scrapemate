@@ -37,6 +37,8 @@ scrapemate fetch https://example.com --timeout 10s > page.md
 
 Markdown is the default. It uses the main landmark, a lone article, or the page body, and omits navigation and footers. Relative links resolve against the final URL and any HTML base URL. Use `--format html` for the full document. To read a long page in pieces, save it once and read ranges from that file.
 
+Use `--format raw` to write the response body to stdout, including plain text, JSON, or binary files. It preserves the body bytes without adding a newline. With `--js`, raw output contains the original navigation response. Use `--format html` to capture the rendered DOM after a selector wait.
+
 Page content goes to stdout. Errors go to stderr. Exit code 0 means success, 1 means a fetch, conversion or output failure, and 2 means a command or flag usage error. A non-2xx status returns 1 and prints the status to stderr. Its page content is still written when the selected format is available.
 
 ## Render a JavaScript page
@@ -63,10 +65,10 @@ scrapemate fetch https://example.com
 
 From the repository root, you can run the same command with `go run ./cmd/scrapemate fetch https://example.com`.
 
-To verify the outgoing IP, keep the variable set and run the bundled Go example from the repository root. It writes the plain-text IP to stdout and the HTTP status to stderr. Compare the IP with the exit IP listed by your proxy provider.
+To verify the outgoing IP, keep the variable set and fetch the IP endpoint as plain text. Compare the output with the exit IP listed by your proxy provider.
 
 ```sh
-go run ./examples/scrape-client https://ipv4.webshare.io/
+scrapemate fetch https://ipv4.webshare.io/ --format raw
 ```
 
 Run `unset SCRAPEMATE_PROXY` when you’re done using the proxy.
