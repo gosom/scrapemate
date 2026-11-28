@@ -5,21 +5,21 @@ import (
 	"testing"
 )
 
-func TestLaunchArgsOmitSingleProcessOnWindows(t *testing.T) {
+func TestLaunchArgsOmitSingleProcessOnWindowsAndMacOS(t *testing.T) {
 	t.Parallel()
 
-	if slices.Contains(launchArgs("windows", false), "--single-process") {
-		t.Fatal("--single-process must not be passed on Windows: Chromium exits on the first navigation")
+	for _, goos := range []string{"windows", "darwin"} {
+		if slices.Contains(launchArgs(goos, false), "--single-process") {
+			t.Errorf("unexpected --single-process on %s", goos)
+		}
 	}
 }
 
-func TestLaunchArgsKeepSingleProcessOnOtherPlatforms(t *testing.T) {
+func TestLaunchArgsKeepSingleProcessOnLinux(t *testing.T) {
 	t.Parallel()
 
-	for _, goos := range []string{"linux", "darwin"} {
-		if !slices.Contains(launchArgs(goos, false), "--single-process") {
-			t.Errorf("expected --single-process on %s", goos)
-		}
+	if !slices.Contains(launchArgs("linux", false), "--single-process") {
+		t.Error("expected --single-process on linux")
 	}
 }
 

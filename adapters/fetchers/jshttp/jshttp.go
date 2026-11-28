@@ -291,9 +291,7 @@ func (o *browser) Close() {
 }
 
 // launchArgs returns the Chromium command line flags for the given GOOS.
-// --single-process is not passed on Windows, where current Chromium builds
-// exit on the first navigation ("Target page, context or browser has been
-// closed") when it is set.
+// Single-process mode can crash Chromium on Windows and macOS.
 func launchArgs(goos string, disableImages bool) []string {
 	args := []string{
 		`--start-maximized`,
@@ -319,7 +317,7 @@ func launchArgs(goos string, disableImages bool) []string {
 		"--disable-web-security",
 	}
 
-	if goos != "windows" {
+	if goos == "linux" {
 		args = append(args, `--single-process`)
 	}
 
