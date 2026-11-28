@@ -537,7 +537,8 @@ func parseProxies(endpoints []string) ([]*url.URL, error) {
 		}
 
 		parsed, err := url.Parse(endpoint)
-		if err != nil || parsed.Hostname() == "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		if err != nil || parsed.Hostname() == "" || (parsed.Path != "" && parsed.Path != "/") ||
+			parsed.RawQuery != "" || parsed.Fragment != "" {
 			return nil, fmt.Errorf("scrape: invalid proxy at position %d", i+1)
 		}
 
@@ -545,6 +546,7 @@ func parseProxies(endpoints []string) ([]*url.URL, error) {
 			return nil, fmt.Errorf("scrape: unsupported proxy at position %d", i+1)
 		}
 
+		parsed.Path = ""
 		proxies = append(proxies, parsed)
 	}
 

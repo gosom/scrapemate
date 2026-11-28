@@ -232,6 +232,44 @@ func TestCloseCancelsFetch(t *testing.T) {
 	require.ErrorIs(t, <-done, scrape.ErrClosed)
 }
 
+func TestProxyURLPath(t *testing.T) {
+	t.Parallel()
+
+	var proxied atomic.Int64
+
+	endpoint := sessionProxy(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, "through proxy")
+	}), &proxied, false)
+
+	for _, tc := range []struct {
+		name, path string
+		valid      bool
+	}{
+		{"no path", "", true},
+		{"root", "/", true},
+		{"non-root", "/api", false},
+		{"repeated slash", "//", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			client, err := scrape.New(scrape.WithProxies([]string{endpoint + tc.path}))
+			if !tc.valid {
+				require.ErrorContains(t, err, "invalid proxy")
+
+				return
+			}
+
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, client.Close()) })
+
+			page, err := client.Fetch(t.Context(), "http://fixture.invalid/")
+			require.NoError(t, err)
+			require.Equal(t, "through proxy", string(page.Response.Body))
+		})
+	}
+}
+
 func TestInvalidConfiguration(t *testing.T) {
 	t.Parallel()
 

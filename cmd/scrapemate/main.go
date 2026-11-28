@@ -63,6 +63,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	flags.Usage = func() {
 		fmt.Fprintln(stdout, usage)
 		flags.PrintDefaults()
+		fmt.Fprintln(stdout, "\nEnvironment:\n  SCRAPEMATE_PROXY    Proxy URL for HTTP and browser fetches (e.g. http://user:pass@host:port/)")
 	}
 	flags.StringVar(&cmd.format, "format", formatMarkdown, "output format (markdown or html)")
 	flags.BoolVar(&cmd.js, "js", false, "render with an installed Playwright Chromium browser")

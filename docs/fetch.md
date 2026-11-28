@@ -52,10 +52,10 @@ Each CLI invocation owns a fresh session.
 
 ## Use an authenticated proxy
 
-Set `SCRAPEMATE_PROXY` in your shell for both HTTP and browser fetches. Replace the example credentials, host, and port with your provider’s values. Omit the trailing `/` after the host or port, even if it appears in your provider’s curl example.
+Set `SCRAPEMATE_PROXY` in your shell for both HTTP and browser fetches. Replace the example credentials, host, and port with your provider’s values. A trailing `/` is optional, so you can copy the proxy URL directly from your provider’s curl example.
 
 ```sh
-export SCRAPEMATE_PROXY='http://USERNAME:PASSWORD@proxy.example:8080'
+export SCRAPEMATE_PROXY='http://USERNAME:PASSWORD@proxy.example:8080/'
 scrapemate fetch https://example.com
 ```
 
