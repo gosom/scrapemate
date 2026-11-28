@@ -214,7 +214,13 @@ func (s *ScrapeMate) Start() error {
 	exitChan := make(chan os.Signal, 1)
 
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)
-	s.waitForSignal(exitChan)
+
+	stopSignal := s.waitForSignal(exitChan)
+
+	defer func() {
+		signal.Stop(exitChan)
+		stopSignal()
+	}()
 
 	if err := s.processInitJob(s.ctx); err != nil {
 		return err
@@ -478,12 +484,26 @@ func (s *ScrapeMate) Err() error {
 	return err
 }
 
-func (s *ScrapeMate) waitForSignal(sigChan <-chan os.Signal) {
+func (s *ScrapeMate) waitForSignal(sigChan <-chan os.Signal) func() {
+	stop := make(chan struct{})
+	done := make(chan struct{})
+
 	go func() {
-		<-sigChan
-		s.log.Info("received signal, shutting down")
-		s.cancelFn(ErrorExitSignal)
+		defer close(done)
+
+		select {
+		case <-sigChan:
+			s.log.Info("received signal, shutting down")
+			s.cancelFn(ErrorExitSignal)
+		case <-s.Done():
+		case <-stop:
+		}
 	}()
+
+	return func() {
+		close(stop)
+		<-done
+	}
 }
 
 func (s *ScrapeMate) processInitJob(ctx context.Context) error {
