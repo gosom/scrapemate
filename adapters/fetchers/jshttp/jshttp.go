@@ -19,6 +19,16 @@ var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
 // at the cost of leaking the underlying resource.
 const closeTimeout = 5 * time.Second
 
+// browserCloseTimeout bounds closing a browser context or a browser the same
+// way closeTimeout bounds a page. BrowserContext.Close can block forever when
+// the driver wedges, which otherwise keeps (*jsFetch).Close, and with it
+// ScrapemateApp.Start, from returning after all results are written.
+var browserCloseTimeout = closeTimeout
+
+// driverStopTimeout bounds stopping the Playwright driver. Stopping the driver
+// is what reaps browsers whose Close was abandoned, so it gets more time.
+var driverStopTimeout = 30 * time.Second
+
 // closeWithTimeout runs closer in a background goroutine and returns when it
 // completes or when d elapses, whichever comes first. On timeout the goroutine
 // is abandoned (it will finish on its own if the driver recovers). Without this
@@ -182,7 +192,7 @@ func (o *jsFetch) Close() error {
 		}
 	}
 
-	_ = o.pw.Stop()
+	closeWithTimeout(o.pw.Stop, driverStopTimeout)
 
 	return nil
 }
@@ -285,8 +295,8 @@ type browser struct {
 }
 
 func (o *browser) Close() {
-	_ = o.ctx.Close()
-	_ = o.browser.Close()
+	closeWithTimeout(func() error { return o.ctx.Close() }, browserCloseTimeout)
+	closeWithTimeout(func() error { return o.browser.Close() }, browserCloseTimeout)
 }
 
 func newBrowser(pw *playwright.Playwright, headless, disableImages bool, proxyPool *ProxyPool, ua string) (*browser, error) {
