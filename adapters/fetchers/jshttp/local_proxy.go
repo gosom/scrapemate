@@ -122,9 +122,10 @@ func startAuthProxy(proxyURL, username, password string, preserveRedirects bool)
 		return nil, fmt.Errorf("proxy URL cannot be empty")
 	}
 
-	if username == "" || password == "" {
-		return nil, fmt.Errorf("username and password are required")
-	}
+	// Allow unauthenticated proxies
+	// if username == "" || password == "" {
+	// 	return nil, fmt.Errorf("username and password are required")
+	// }
 
 	upstreamURL, err := url.Parse(proxyURL)
 	if err != nil {
