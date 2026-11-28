@@ -39,9 +39,5 @@ func asSlice(t any) []any {
 		return isSlice
 	}
 
-	var elements []any
-
-	elements = append(elements, t)
-
-	return elements
+	return []any{t}
 }

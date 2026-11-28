@@ -2,7 +2,10 @@ package jshttp
 
 import (
 	"context"
+	"errors"
 	"testing"
+
+	"github.com/mxschmitt/playwright-go"
 )
 
 func newJSFetchForTest(size int) (*jsFetch, *fakeRuntimeFactory) {
@@ -30,6 +33,7 @@ func TestGetSlotWaitsAtCapacityInsteadOfCreatingOverflowBrowser(t *testing.T) {
 	}
 
 	done := make(chan error, 1)
+
 	go func() {
 		_, err := fetcher.getSlot(ctx)
 		done <- err
@@ -214,5 +218,77 @@ func TestSessionSlotRecreatesPageWhenPrimaryPageIsClosed(t *testing.T) {
 
 	if page1 == page2 {
 		t.Fatalf("expected closed page to be replaced")
+	}
+}
+
+// brokenPageRuntime cannot recreate pages or contexts, which forces
+// acquirePage to fall back to recreating the whole browser.
+type brokenPageRuntime struct {
+	*fakeRuntime
+	browserErr error
+}
+
+func (r *brokenPageRuntime) recreatePage() error { return errors.New("page closed") }
+
+func (r *brokenPageRuntime) recreateContext() error { return errors.New("context closed") }
+
+func (r *brokenPageRuntime) recreateBrowser() error {
+	if r.browserErr != nil {
+		return r.browserErr
+	}
+
+	return r.fakeRuntime.recreateBrowser()
+}
+
+func TestSessionSlotReturnsPageAfterBrowserRecreation(t *testing.T) {
+	t.Parallel()
+
+	slot := &sessionSlot{runtime: &brokenPageRuntime{fakeRuntime: &fakeRuntime{nextPageID: 1}}}
+
+	p, err := slot.acquirePage(context.Background())
+	if err != nil {
+		t.Fatalf("acquirePage returned error: %v", err)
+	}
+
+	if p == nil {
+		t.Fatalf("expected a page after browser recreation, got nil")
+	}
+}
+
+func TestSessionSlotReturnsErrorWhenBrowserRecreationFails(t *testing.T) {
+	t.Parallel()
+
+	errBrowser := errors.New("browser launch failed")
+	slot := &sessionSlot{runtime: &brokenPageRuntime{
+		fakeRuntime: &fakeRuntime{nextPageID: 1},
+		browserErr:  errBrowser,
+	}}
+
+	p, err := slot.acquirePage(context.Background())
+	if !errors.Is(err, errBrowser) {
+		t.Fatalf("expected %v, got %v", errBrowser, err)
+	}
+
+	if p != nil {
+		t.Fatalf("expected no page when browser recreation fails, got %v", p)
+	}
+}
+
+type stubPlaywrightPage struct {
+	playwright.Page
+	closed bool
+}
+
+func (s stubPlaywrightPage) IsClosed() bool { return s.closed }
+
+func TestPlaywrightPageIsClosed(t *testing.T) {
+	open := &playwrightPage{p: stubPlaywrightPage{closed: false}}
+	if open.isClosed() {
+		t.Fatal("open page reported as closed")
+	}
+
+	closed := &playwrightPage{p: stubPlaywrightPage{closed: true}}
+	if !closed.isClosed() {
+		t.Fatal("closed page reported as open")
 	}
 }

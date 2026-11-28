@@ -109,6 +109,15 @@ func createSOCKS5ProxyClient(upstream *url.URL, auth *proxy.Auth) *http.Client {
 
 // StartAuthProxy starts an HTTP proxy that authenticates against an upstream proxy (HTTP or SOCKS5)
 func StartAuthProxy(proxyURL, username, password string) (*AuthProxy, error) {
+	return startAuthProxy(proxyURL, username, password, false)
+}
+
+// StartAuthProxyPreservingRedirects forwards redirect responses to the downstream client.
+func StartAuthProxyPreservingRedirects(proxyURL, username, password string) (*AuthProxy, error) {
+	return startAuthProxy(proxyURL, username, password, true)
+}
+
+func startAuthProxy(proxyURL, username, password string, preserveRedirects bool) (*AuthProxy, error) {
 	if proxyURL == "" {
 		return nil, fmt.Errorf("proxy URL cannot be empty")
 	}
@@ -157,6 +166,12 @@ func StartAuthProxy(proxyURL, username, password string) (*AuthProxy, error) {
 		authProxy.client = createSOCKS5ProxyClient(&upstream, authProxy.socks5Auth)
 	} else {
 		authProxy.client = createHTTPProxyClient(&upstream)
+	}
+
+	if preserveRedirects {
+		authProxy.client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
 	}
 
 	authProxy.bufferPool = sync.Pool{
@@ -213,7 +228,7 @@ func (p *AuthProxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, r.Method, r.URL.String(), r.Body)
+	req, err := http.NewRequestWithContext(ctx, r.Method, r.URL.String(), r.Body) //nolint:gosec // G704: this proxy intentionally forwards the caller's URL.
 	if err != nil {
 		http.Error(w, "Failed to create request", http.StatusBadRequest)
 
@@ -230,7 +245,7 @@ func (p *AuthProxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		req.Header.Set("Proxy-Authorization", "Basic "+p.auth)
 	}
 
-	resp, err := p.client.Do(req)
+	resp, err := p.client.Do(req) //nolint:gosec // G704: the caller's URL is the intended proxy destination.
 	if err != nil {
 		p.logger.Printf("HTTP request failed: %v", err)
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)

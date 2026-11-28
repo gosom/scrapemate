@@ -25,6 +25,11 @@ func NewCsvWriter(w *csv.Writer) scrapemate.ResultWriter {
 // Run runs the writer.
 func (c *csvWriter) Run(_ context.Context, in <-chan scrapemate.Result) error {
 	for result := range in {
+		// Jobs that only yield next jobs send results without data
+		if result.Data == nil {
+			continue
+		}
+
 		elements, err := c.getCsvCapable(result.Data)
 		if err != nil {
 			return err

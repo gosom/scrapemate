@@ -7,6 +7,7 @@ import (
 
 func TestPlaywrightRunOptions(t *testing.T) {
 	originalValue, wasSet := os.LookupEnv(skipPlaywrightBrowserInstallEnv)
+
 	t.Cleanup(func() {
 		if wasSet {
 			_ = os.Setenv(skipPlaywrightBrowserInstallEnv, originalValue)
@@ -38,6 +39,7 @@ func TestPlaywrightRunOptions(t *testing.T) {
 			} else {
 				err = os.Setenv(skipPlaywrightBrowserInstallEnv, testCase.value)
 			}
+
 			if err != nil {
 				t.Fatalf("set test environment: %v", err)
 			}
@@ -46,15 +48,19 @@ func TestPlaywrightRunOptions(t *testing.T) {
 			if len(options) != 1 {
 				t.Fatalf("expected one Playwright run option, got %d", len(options))
 			}
+
 			if options[0] == nil {
 				t.Fatal("expected non-nil Playwright run option")
 			}
+
 			if len(options[0].Browsers) != 1 || options[0].Browsers[0] != "chromium" {
 				t.Fatalf("expected only Chromium, got %v", options[0].Browsers)
 			}
+
 			if !options[0].Verbose {
 				t.Fatal("expected verbose Playwright installation")
 			}
+
 			if options[0].SkipInstallBrowsers != testCase.skipInstallBrowsers {
 				t.Fatalf(
 					"expected SkipInstallBrowsers=%t, got %t",

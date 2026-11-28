@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/google/uuid"
 	"github.com/gosom/scrapemate"
+	"uuid"
 )
 
 type BookCollectJob struct {

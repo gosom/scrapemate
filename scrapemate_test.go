@@ -3,6 +3,7 @@ package scrapemate_test
 import (
 	"context"
 	"errors"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -79,6 +80,7 @@ func Test_New_With_Options(t *testing.T) {
 	t.Run("with context", func(t *testing.T) {
 		ctx, cancel := context.WithCancelCause(context.Background())
 		defer cancel(errors.New("test"))
+
 		mate, err := scrapemate.New(
 			scrapemate.WithJobProvider(svc.provider),
 			scrapemate.WithHTTPFetcher(svc.fetcher),
@@ -209,6 +211,7 @@ func Test_Done_Err(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, mate)
 	cancelFn(errors.New("test"))
+
 	select {
 	case <-mate.Done():
 	default:
@@ -328,6 +331,7 @@ func Test_Start(t *testing.T) {
 			err = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 			require.NoError(t, err)
 		}
+
 		require.NoError(t, mate.Err())
 	})
 	t.Run("handles job provider errors", func(t *testing.T) {
@@ -434,7 +438,9 @@ func Test_Start(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			require.Fail(t, "timeout")
 		}
+
 		cancel(scrapemate.ErrorExitSignal)
+
 		select {
 		case err := <-mateErr:
 			require.Equal(t, scrapemate.ErrorExitSignal, err)
@@ -540,6 +546,7 @@ func Test_Start(t *testing.T) {
 
 		ch := func() <-chan scrapemate.IJob {
 			ans := make(chan scrapemate.IJob, 1)
+
 			j := testJobWithNext{
 				Job: scrapemate.Job{
 					URL: "http://example.com",
@@ -853,5 +860,65 @@ func Test_DoJob(t *testing.T) {
 
 		_, _, err = mate.DoJob(ctx, &job)
 		require.Error(t, err)
+	})
+}
+
+func assertNoWaitForSignalGoroutine(t *testing.T) {
+	t.Helper()
+
+	buf := make([]byte, 1<<20)
+	n := runtime.Stack(buf, true)
+	require.NotContains(t, string(buf[:n]), "waitForSignal")
+}
+
+func Test_Start_NoSignalGoroutineLeak(t *testing.T) {
+	t.Run("context cancellation", func(t *testing.T) {
+		svc := getMockedServices(t)
+		ctx, cancelFn := context.WithCancelCause(context.Background())
+
+		mate, err := scrapemate.New(
+			scrapemate.WithJobProvider(svc.provider),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
+			scrapemate.WithContext(ctx, cancelFn),
+		)
+		require.NoError(t, err)
+
+		svc.provider.EXPECT().Jobs(ctx).DoAndReturn(func(context.Context) (<-chan scrapemate.Job, <-chan error) {
+			return make(chan scrapemate.Job), make(chan error)
+		})
+
+		errc := make(chan error, 1)
+
+		go func() {
+			errc <- mate.Start()
+		}()
+
+		cancelFn(errors.New("done"))
+
+		err = <-errc
+		require.EqualError(t, err, "done")
+		assertNoWaitForSignalGoroutine(t)
+	})
+	t.Run("init job failure", func(t *testing.T) {
+		svc := getMockedServices(t)
+		initJob := scrapemate.Job{
+			URL:         "http://example.com",
+			RetryPolicy: scrapemate.DiscardJob,
+		}
+
+		mate, err := scrapemate.New(
+			scrapemate.WithJobProvider(svc.provider),
+			scrapemate.WithHTTPFetcher(svc.fetcher),
+			scrapemate.WithInitJob(&initJob),
+		)
+		require.NoError(t, err)
+
+		svc.fetcher.EXPECT().Fetch(gomock.Any(), &initJob).Return(scrapemate.Response{
+			Error: errors.New("init failed"),
+		})
+
+		err = mate.Start()
+		require.EqualError(t, err, "init failed")
+		assertNoWaitForSignalGoroutine(t)
 	})
 }

@@ -80,7 +80,9 @@ func (s *sessionSlot) acquirePage(ctx context.Context) (page, error) {
 
 	if err := s.runtime.recreatePage(); err != nil {
 		if err := s.runtime.recreateContext(); err != nil {
-			return nil, s.runtime.recreateBrowser()
+			if err := s.runtime.recreateBrowser(); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -213,7 +215,7 @@ type playwrightPage struct {
 }
 
 func (p *playwrightPage) isClosed() bool {
-	return !p.p.IsClosed()
+	return p.p.IsClosed()
 }
 
 func (p *playwrightPage) playwrightPage() playwright.Page {

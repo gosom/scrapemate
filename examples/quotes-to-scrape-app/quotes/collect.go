@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/google/uuid"
 	"github.com/gosom/scrapemate"
+	"uuid"
 )
 
 // QuoteCollectJob is a job that collects quotes from a page
