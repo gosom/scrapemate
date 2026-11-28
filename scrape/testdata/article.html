@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><base href="../guide/"></head>
+<body>
+  <nav>Global navigation</nav>
+  <main>
+    <nav>Page navigation</nav>
+    <h1>Installing the client</h1>
+    <p>See the <a href="setup#go">Go instructions</a>.</p>
+    <ul><li>Download the binary</li><li>Run the command</li></ul>
+    <pre><code class="language-go">package main
+
+func main() {
+    println("hello")
+}</code></pre>
+    <table><thead><tr><th>Command</th><th>Result</th></tr></thead>
+    <tbody><tr><td>fetch</td><td>One page</td></tr></tbody></table>
+    <script>
+      setTimeout(() => {
+        const p = document.createElement("p");
+        p.id = "ready";
+        p.textContent = "Browser " + "content";
+        document.querySelector("main").appendChild(p);
+      }, 50);
+    </script>
+  </main>
+  <footer>Site footer</footer>
+</body>
+</html>

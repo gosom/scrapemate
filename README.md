@@ -6,6 +6,23 @@
 
 [Scrapemate](https://gosom.github.io/scrapemate) is a web crawling and scraping framework written in Golang. It is designed to be simple and easy to use, yet powerful enough to handle complex scraping tasks.
 
+## Read a page as Markdown
+
+With the CLI on your path, fetch a page directly. HTTP mode needs no browser or API key.
+
+```sh
+scrapemate fetch https://example.com --format markdown
+```
+
+To try it from this checkout, run `go run ./cmd/scrapemate fetch https://example.com`. For prebuilt binaries, JavaScript rendering, and the matching Go example, see the [fetch guide](docs/fetch.md). Coding agents can use the [Scrapemate skill](skills/scrapemate/SKILL.md).
+
+## Featured sponsor
+
+<a href="https://www.webshare.io/?referral_code=0q3l81eet8mp">
+  <img src="./img/webshare-mapsscraper-banner.png" alt="Webshare proxy offer — 20% off your first purchase with MAPSSCRAPER20" width="600">
+</a>
+
+Scrapemate works with a direct connection. If you need a proxy, you can try Webshare through our [sponsor referral link](https://www.webshare.io/?referral_code=0q3l81eet8mp). Use `MAPSSCRAPER20` for 20% off your first purchase.
 
 ## Features
 
@@ -88,7 +105,7 @@ go run github.com/mxschmitt/playwright-go/cmd/playwright install --with-deps chr
 go run ./examples/scrape-client -js -wait 'h1' https://example.com
 ```
 
-Set `SCRAPEMATE_PROXY` to a proxy URL to use it with either example command.
+Set `SCRAPEMATE_PROXY` to a proxy URL to use it with either example command. See [Use an authenticated proxy](docs/fetch.md#use-an-authenticated-proxy) for an example and an outgoing-IP check.
 
 Use HTTP mode to fetch attachments. If Chromium treats a response as a download, JavaScript mode returns a navigation error.
 
@@ -249,6 +266,12 @@ See an example of how you can use `scrapemate` go scrape Google Maps: https://gi
 ## Contributing
 
 Contributions are welcome.
+
+## Responsible use and sponsor disclaimer
+
+Scrapemate is built for legitimate crawling and data collection. You are responsible for how you use it and for complying with applicable laws and the terms of the sites you access.
+
+Sponsors operate their services independently. If you use a sponsor, you deal directly with that provider under its own terms. The maintainer disclaims responsibility for sponsors’ products, services, claims, or any losses arising from their use.
 
 ## Licence
 

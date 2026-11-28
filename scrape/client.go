@@ -29,6 +29,7 @@ type Result struct {
 	Response scrapemate.Response
 
 	renderedHTML *string
+	artifacts    map[string]Artifact
 }
 
 // HTML returns the source HTML in HTTP mode or the rendered DOM in JavaScript
@@ -38,11 +39,16 @@ func (r *Result) HTML() string {
 		return *r.renderedHTML
 	}
 
-	if isHTML(&r.Response) {
+	if r.IsHTML() {
 		return string(r.Response.Body)
 	}
 
 	return ""
+}
+
+// IsHTML reports whether the navigation response contains an HTML document.
+func (r *Result) IsHTML() bool {
+	return isHTML(&r.Response)
 }
 
 func isHTML(resp *scrapemate.Response) bool {
@@ -64,6 +70,7 @@ type clientConfig struct {
 
 type fetchConfig struct {
 	selector string
+	outputs  []Output
 }
 
 // Option configures a client.
@@ -226,7 +233,11 @@ func (c *Client) Fetch(ctx context.Context, target string, opts ...FetchOption) 
 	defer func() { <-c.gate }()
 
 	started := time.Now()
+
 	result, err := c.session.fetch(ctx, target, cfg)
+	if err == nil && len(cfg.outputs) > 0 {
+		err = result.produceOutputs(ctx, cfg.outputs)
+	}
 
 	if result != nil {
 		result.Response.Duration = time.Since(started)
@@ -526,7 +537,8 @@ func parseProxies(endpoints []string) ([]*url.URL, error) {
 		}
 
 		parsed, err := url.Parse(endpoint)
-		if err != nil || parsed.Hostname() == "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		if err != nil || parsed.Hostname() == "" || (parsed.Path != "" && parsed.Path != "/") ||
+			parsed.RawQuery != "" || parsed.Fragment != "" {
 			return nil, fmt.Errorf("scrape: invalid proxy at position %d", i+1)
 		}
 
@@ -534,6 +546,7 @@ func parseProxies(endpoints []string) ([]*url.URL, error) {
 			return nil, fmt.Errorf("scrape: unsupported proxy at position %d", i+1)
 		}
 
+		parsed.Path = ""
 		proxies = append(proxies, parsed)
 	}
 

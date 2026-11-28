@@ -21,6 +21,7 @@ func main() {
 
 func run() (err error) {
 	useJS := flag.Bool("js", false, "render the page with Chromium")
+	markdown := flag.Bool("markdown", false, "write the page's main content as Markdown")
 	selector := flag.String("wait", "", "wait for a visible CSS selector in Chromium")
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage: scrape-client [flags] URL")
@@ -53,6 +54,10 @@ func run() (err error) {
 	defer cancel()
 
 	var fetchOptions []scrape.FetchOption
+	if *markdown {
+		fetchOptions = append(fetchOptions, scrape.WithOutputs(scrape.Markdown()))
+	}
+
 	if *selector != "" {
 		fetchOptions = append(fetchOptions, scrape.WaitFor(*selector))
 	}
@@ -63,6 +68,17 @@ func run() (err error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "%d %s\n", result.Response.StatusCode, result.Response.URL)
+
+	if *markdown {
+		doc, ok := result.Artifact("markdown")
+		if !ok {
+			return errors.New("missing Markdown artifact")
+		}
+
+		_, err = os.Stdout.Write(doc.Data)
+
+		return err
+	}
 
 	if html := result.HTML(); html != "" {
 		_, err = fmt.Fprint(os.Stdout, html)
